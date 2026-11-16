@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Inglés de Trabajo</title>
+<meta name="description" content="Inglés para trabajar: vocabulario, oraciones, XP y rachas diarias.">
+<meta name="theme-color" content="#58CC02">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Inglés Trabajo">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <div class="brand">🦉 <span>Inglés de Trabajo</span></div>
+  <div class="stats"><span class="pill lvl" id="hdr-lvl">B1</span><span class="pill fire" id="hdr-streak">🔥 0</span><span class="pill xp" id="hdr-xp">⚡ 0</span></div>
+</header>
+<main id="main"></main>
+<nav>
+  <button data-act="tab" data-v="inicio">🏠<span>Inicio</span></button>
+  <button data-act="tab" data-v="vocab">📚<span>Vocabulario</span></button>
+  <button data-act="tab" data-v="frases">💬<span>Oraciones</span></button>
+</nav>
+<div id="toast"></div>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
