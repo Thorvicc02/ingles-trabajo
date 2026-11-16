@@ -215,3 +215,196 @@ LEVELS.forEach((l) => {
     SENTS[l][t].forEach((s, i) => ALL_SENTS.push({ id: `${l}-${t}-${i}`, lvl: l, th: t, en: s[0], es: s[1] }));
   });
 });
+
+
+/* ---------- Checo de supervivencia (A0–A1) ----------
+   El campo `en` guarda el texto en el idioma que se estudia (aquí, checo),
+   para reutilizar las mismas vistas. `pron` es una pista al estilo español.
+   `ex` / `exes` son un ejemplo en checo y su traducción.
+*/
+const CS_LEVELS = ["A1"];
+const CS_LVL_LABEL = { A1: "A0–A1 Supervivencia" };
+const CS_THEMES = ["saludos", "numeros", "transporte", "compras", "vivienda", "trabajo", "emergencias"];
+const CS_TH_LABEL = {
+  saludos: "Saludos y cortesía",
+  numeros: "Números y dinero",
+  transporte: "Transporte y ciudad",
+  compras: "Compras y supermercado",
+  vivienda: "Vivienda / arriendo",
+  trabajo: "Trabajo (primer día)",
+  emergencias: "Emergencias y salud",
+};
+
+// [checo, español, pronunciación, ejemplo checo, ejemplo español]
+const CS_WORDS = {
+  saludos: [
+    ["Dobrý den", "buenos días / buen día (formal; se usa todo el día)", "dóbri den", "Dobrý den, jak se máte?", "Buenos días, ¿cómo está?"],
+    ["Dobré ráno", "buenos días (por la mañana)", "dóbre ráno", "Dobré ráno, jste připraven?", "Buenos días, ¿está listo?"],
+    ["Dobrý večer", "buenas tardes / buenas noches (al llegar)", "dóbri vécher", "Dobrý večer, vítejte.", "Buenas tardes, bienvenido."],
+    ["Dobrou noc", "buenas noches (al irse a dormir)", "dóbrou notz", "Dobrou noc, zítra ráno.", "Buenas noches, hasta mañana por la mañana."],
+    ["Ahoj", "hola / chao (informal)", "ájoy", "Ahoj, jak se máš?", "Hola, ¿cómo estás?"],
+    ["Na shledanou", "adiós (formal)", "na sjledánou", "Na shledanou, hezký den.", "Adiós, que tenga un buen día."],
+    ["Prosím", "por favor / de nada / dígame", "prósim", "Děkuji. — Prosím.", "Gracias. — De nada."],
+    ["Děkuji", "gracias", "dyékuyi", "Děkuji za pomoc.", "Gracias por la ayuda."],
+    ["Promiňte", "disculpe / perdón (formal)", "prómiñte", "Promiňte, kde je metro?", "Disculpe, ¿dónde está el metro?"],
+    ["Ano", "sí", "áno", "Ano, rozumím.", "Sí, entiendo."],
+    ["Ne", "no", "ne", "Ne, nemluvím česky.", "No, no hablo checo."],
+    ["Těší mě", "mucho gusto", "tyéshi mnye", "Těší mě, jmenuji se Víctor.", "Mucho gusto, me llamo Víctor."],
+  ],
+  numeros: [
+    ["jedna", "uno / una", "yédna", "Jedna koruna.", "Una corona."],
+    ["dvě", "dos", "dvye", "Dvě piva, prosím.", "Dos cervezas, por favor."],
+    ["tři", "tres", "trzhi", "Tři lístky, prosím.", "Tres boletos, por favor."],
+    ["čtyři", "cuatro", "chtírzhi", "Čtyři hodiny.", "Cuatro horas."],
+    ["pět", "cinco", "pyet", "Pět korun.", "Cinco coronas."],
+    ["deset", "diez", "déset", "Deset minut.", "Diez minutos."],
+    ["dvacet", "veinte", "dvátzet", "Dvacet korun.", "Veinte coronas."],
+    ["sto", "cien", "sto", "Sto korun.", "Cien coronas."],
+    ["koruna", "corona (moneda checa, CZK)", "kóruna", "To stojí sto korun.", "Cuesta cien coronas."],
+    ["peníze", "dinero", "péniye", "Nemám peníze.", "No tengo dinero."],
+    ["karta", "tarjeta", "kárta", "Platím kartou.", "Pago con tarjeta."],
+    ["hotově", "en efectivo", "hótovye", "Platím hotově.", "Pago en efectivo."],
+    ["účet", "la cuenta / factura", "úchet", "Účet, prosím.", "La cuenta, por favor."],
+  ],
+  transporte: [
+    ["vlak", "tren", "vlak", "Vlak jede v osm.", "El tren sale a las ocho."],
+    ["autobus", "autobús", "áutobus", "Autobus je na zastávce.", "El autobús está en la parada."],
+    ["metro", "metro", "metro", "Metro je rychlé.", "El metro es rápido."],
+    ["tramvaj", "tranvía", "trámvay", "Čekám na tramvaj.", "Estoy esperando el tranvía."],
+    ["jízdenka", "boleto / pasaje", "yízdenka", "Chci jednu jízdenku.", "Quiero un boleto."],
+    ["nádraží", "estación de tren", "nádrazhí", "Nádraží je blízko.", "La estación está cerca."],
+    ["zastávka", "parada", "zastávka", "Kde je zastávka?", "¿Dónde está la parada?"],
+    ["letiště", "aeropuerto", "létyishtye", "Jedeme na letiště.", "Vamos al aeropuerto."],
+    ["ulice", "calle", "úlitze", "Jaká je to ulice?", "¿Qué calle es esta?"],
+    ["náměstí", "plaza", "námnyesti", "Václavské náměstí.", "Plaza de Wenceslao."],
+    ["vlevo", "a la izquierda", "vlévo", "Zahněte vlevo.", "Gire a la izquierda."],
+    ["vpravo", "a la derecha", "vprávo", "Zahněte vpravo.", "Gire a la derecha."],
+    ["rovně", "derecho (seguir recto)", "rovnye", "Jděte rovně.", "Siga derecho."],
+    ["kde", "dónde", "gde", "Kde je nádraží?", "¿Dónde está la estación?"],
+  ],
+  compras: [
+    ["obchod", "tienda", "ópjot", "Hledám obchod.", "Estoy buscando una tienda."],
+    ["supermarket", "supermercado", "súpermarket", "Supermarket je tady blízko.", "El supermercado queda aquí cerca."],
+    ["voda", "agua", "voda", "Vodu, prosím.", "Agua, por favor."],
+    ["chléb", "pan", "jlep", "Chléb, prosím.", "Pan, por favor."],
+    ["mléko", "leche", "mléko", "Jedno mléko, prosím.", "Una leche, por favor."],
+    ["pivo", "cerveza", "pivo", "Jedno pivo, prosím.", "Una cerveza, por favor."],
+    ["káva", "café", "káva", "Jednu kávu, prosím.", "Un café, por favor."],
+    ["ovoce", "fruta", "óvotze", "Čerstvé ovoce.", "Fruta fresca."],
+    ["účtenka", "boleta / ticket", "újtenka", "Účtenku, prosím.", "La boleta, por favor."],
+    ["otevřeno", "abierto", "ótevrzheno", "Je otevřeno do šesti.", "Está abierto hasta las seis."],
+    ["zavřeno", "cerrado", "závrzheno", "Dnes je zavřeno.", "Hoy está cerrado."],
+    ["pokladna", "caja", "pókladna", "Pokladna je vlevo.", "La caja está a la izquierda."],
+    ["taška", "bolsa", "tashka", "Tašku, prosím.", "Una bolsa, por favor."],
+  ],
+  vivienda: [
+    ["byt", "departamento", "bit", "Hledám byt.", "Busco un departamento."],
+    ["pokoj", "habitación", "pókoi", "Pokoj je velký.", "La habitación es grande."],
+    ["nájem", "arriendo / alquiler", "náyem", "Nájem je vysoký.", "El arriendo es alto."],
+    ["klíče", "llaves", "klíche", "Tady jsou klíče.", "Aquí están las llaves."],
+    ["kuchyň", "cocina", "kujíñ", "Kuchyň je malá.", "La cocina es chica."],
+    ["koupelna", "baño (de la casa)", "kópelna", "Koupelna je čistá.", "El baño está limpio."],
+    ["postel", "cama", "póstel", "Postel je pohodlná.", "La cama es cómoda."],
+    ["wi-fi", "wifi", "vaj-faj", "Heslo na wi-fi, prosím.", "La clave del wifi, por favor."],
+    ["záloha", "depósito / garantía", "záloha", "Záloha je jeden nájem.", "El depósito es un mes de arriendo."],
+    ["smlouva", "contrato", "smlóva", "Tady je smlouva.", "Aquí está el contrato."],
+    ["soused", "vecino", "sóused", "Soused je milý.", "El vecino es amable."],
+    ["adresa", "dirección", "ádresa", "Jaká je vaše adresa?", "¿Cuál es su dirección?"],
+  ],
+  trabajo: [
+    ["práce", "trabajo", "prátze", "Hledám práci.", "Estoy buscando trabajo."],
+    ["šéf", "jefe", "shef", "Můj šéf se jmenuje Jan.", "Mi jefe se llama Jan."],
+    ["kolega", "colega (hombre)", "kólega", "To je můj kolega.", "Este es mi colega."],
+    ["kolegyně", "colega (mujer)", "kólegiñe", "To je moje kolegyně.", "Esta es mi colega."],
+    ["směna", "turno", "smnyena", "Mám noční směnu.", "Tengo el turno de noche."],
+    ["životopis", "currículum", "zhívotopis", "Tady je můj životopis.", "Aquí está mi currículum."],
+    ["pohovor", "entrevista de trabajo", "póhovor", "Mám pohovor zítra.", "Tengo una entrevista mañana."],
+    ["přestávka", "pausa / descanso", "przhestávka", "Mám přestávku.", "Tengo una pausa."],
+    ["plat", "sueldo", "plat", "Jaký je plat?", "¿Cuál es el sueldo?"],
+    ["kancelář", "oficina", "kántselarzh", "Kancelář je tady.", "La oficina está aquí."],
+    ["dnes", "hoy", "dnes", "Dnes pracuji.", "Hoy trabajo."],
+    ["zítra", "mañana (el día)", "zítra", "Zítra začínám.", "Mañana empiezo."],
+  ],
+  emergencias: [
+    ["pomoc", "ayuda", "pómotz", "Pomoc, prosím!", "¡Ayuda, por favor!"],
+    ["nemocnice", "hospital", "némoztñitse", "Nemocnice je daleko.", "El hospital queda lejos."],
+    ["lékař", "médico", "lékarzh", "Potřebuji lékaře.", "Necesito un médico."],
+    ["lékárna", "farmacia", "lékárna", "Kde je lékárna?", "¿Dónde está la farmacia?"],
+    ["bolest", "dolor", "bólest", "Mám silnou bolest.", "Tengo un dolor fuerte."],
+    ["lék", "medicamento", "lek", "Potřebuji lék.", "Necesito un medicamento."],
+    ["pojištění", "seguro (de salud / viaje)", "poyishtyení", "Mám cestovní pojištění.", "Tengo seguro de viaje."],
+    ["policie", "policía", "pólitsie", "Zavolejte policii.", "Llame a la policía."],
+    ["hasiči", "bomberos", "hásichi", "Zavolejte hasiče.", "Llame a los bomberos."],
+    ["sanitka", "ambulancia", "sáñitka", "Zavolejte sanitku.", "Llame una ambulancia."],
+    ["alergie", "alergia", "álergie", "Mám alergii.", "Tengo una alergia."],
+    ["toaleta", "baño / servicio", "tóaleta", "Kde je toaleta?", "¿Dónde está el baño?"],
+  ],
+};
+
+// [checo, español, pronunciación]
+const CS_SENTS = {
+  saludos: [
+    ["Dobrý den, jmenuji se Víctor.", "Buenos días, me llamo Víctor.", "dóbri den, yménuyi se Víktor"],
+    ["Těší mě.", "Mucho gusto.", "tyéshi mnye"],
+    ["Jak se máte?", "¿Cómo está usted?", "yak se máte"],
+    ["Nerozumím. Mluvíte anglicky?", "No entiendo. ¿Habla inglés?", "nérozumím. mlúvíte ánglitzki"],
+    ["Můžete to zopakovat, prosím?", "¿Puede repetirlo, por favor?", "múzhete to zópakovat, prósim"],
+    ["Můžete mluvit pomaleji, prosím?", "¿Puede hablar más despacio, por favor?", "múzhete mlúvit pómaleji, prósim"],
+  ],
+  numeros: [
+    ["Kolik to stojí?", "¿Cuánto cuesta?", "kólik to stóyi"],
+    ["Můžu platit kartou?", "¿Puedo pagar con tarjeta?", "múzhu plátit kártou"],
+    ["Platím hotově.", "Pago en efectivo.", "plátim hótovye"],
+    ["Účet, prosím.", "La cuenta, por favor.", "úchet, prósim"],
+    ["Je to moc drahé.", "Es demasiado caro.", "ye to motz dráhe"],
+    ["Máte slevu?", "¿Tienen descuento?", "máte slévu"],
+  ],
+  transporte: [
+    ["Kde je nádraží, prosím?", "¿Dónde está la estación, por favor?", "gde ye nádrazhí, prósim"],
+    ["Jednu jízdenku, prosím.", "Un boleto, por favor.", "yédnu yízdenku, prósim"],
+    ["Jak se dostanu na letiště?", "¿Cómo llego al aeropuerto?", "yak se dóstanu na létyishtye"],
+    ["Musím vystoupit tady?", "¿Tengo que bajarme aquí?", "músím vístoupit tádi"],
+    ["Je to daleko pěšky?", "¿Queda lejos a pie?", "ye to dáleko pyeshki"],
+    ["Zahněte vlevo a pak rovně.", "Gire a la izquierda y luego siga derecho.", "záhñete vlévo a pak rovnye"],
+  ],
+  compras: [
+    ["Hledám supermarket.", "Estoy buscando un supermercado.", "hlédám súpermarket"],
+    ["Máte vodu, prosím?", "¿Tienen agua, por favor?", "máte vodu, prósim"],
+    ["Jedno pivo, prosím.", "Una cerveza, por favor.", "yédno pivo, prósim"],
+    ["Účtenku, prosím.", "La boleta, por favor.", "újtenku, prósim"],
+    ["Je otevřeno?", "¿Está abierto?", "ye ótevrzheno"],
+    ["Kde je pokladna?", "¿Dónde está la caja?", "gde ye pókladna"],
+  ],
+  vivienda: [
+    ["Hledám byt k pronájmu.", "Busco un departamento en arriendo.", "hlédám bit k pronáymu"],
+    ["Kolik je nájem?", "¿Cuánto es el arriendo?", "kólik ye náyem"],
+    ["Je tu wi-fi?", "¿Hay wifi?", "ye tu vaj-faj"],
+    ["Kde jsou klíče?", "¿Dónde están las llaves?", "gde ysou klíche"],
+    ["Kdy se mohu nastěhovat?", "¿Cuándo me puedo mudar?", "gdi se móhu nástyehovat"],
+    ["Je pokoj ještě volný?", "¿La habitación sigue disponible?", "ye pókoi yéshte volní"],
+  ],
+  trabajo: [
+    ["Dnes je můj první den v práci.", "Hoy es mi primer día de trabajo.", "dnes ye muy prvñí den f prátzi"],
+    ["Kde je můj šéf?", "¿Dónde está mi jefe?", "gde ye muy shef"],
+    ["V kolik hodin začínám?", "¿A qué hora empiezo?", "f kólik hódin záchínám"],
+    ["Pracuji od osmi do čtyř.", "Trabajo de ocho a cuatro.", "prátsuyi od osmi do chtířzh"],
+    ["Můžu si vzít přestávku?", "¿Puedo tomar una pausa?", "múzhu si vzít przhestávku"],
+    ["Promiňte, přijdu pozdě.", "Disculpe, voy a llegar tarde.", "prómiñte, przhiydu pozdye"],
+  ],
+  emergencias: [
+    ["Pomoc!", "¡Ayuda!", "pómotz"],
+    ["Potřebuji lékaře.", "Necesito un médico.", "pótrzhébuyi lékarzhe"],
+    ["Kde je nejbližší nemocnice?", "¿Dónde está el hospital más cercano?", "gde ye néyblishshí némoztñitse"],
+    ["Bolí mě hlava.", "Me duele la cabeza.", "bóli mnye hlava"],
+    ["Zavolejte sanitku, prosím.", "Llame una ambulancia, por favor.", "závoleyte sáñitku, prósim"],
+    ["Mám cestovní pojištění.", "Tengo seguro de viaje.", "mam tséstovñí poyishtyení"],
+    ["Kde je toaleta?", "¿Dónde está el baño?", "gde ye tóaleta"],
+  ],
+};
+
+const CS_ALL_WORDS = [];
+const CS_ALL_SENTS = [];
+CS_THEMES.forEach((t) => {
+  CS_WORDS[t].forEach((w, i) => CS_ALL_WORDS.push({ id: `cs-${t}-${i}`, lvl: "A1", th: t, en: w[0], es: w[1], pron: w[2], ex: w[3], exes: w[4] }));
+  CS_SENTS[t].forEach((s, i) => CS_ALL_SENTS.push({ id: `cs-${t}-${i}`, lvl: "A1", th: t, en: s[0], es: s[1], pron: s[2] }));
+});

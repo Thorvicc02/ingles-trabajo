@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Inglés de Trabajo</title>
-<meta name="description" content="Inglés para trabajar: vocabulario, oraciones, XP y rachas diarias.">
+<meta name="description" content="Inglés para trabajar y checo de supervivencia: vocabulario, oraciones, XP y rachas diarias.">
 <meta name="theme-color" content="#58CC02">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,8 +17,14 @@
 </head>
 <body>
 <header>
-  <div class="brand">🦉 <span>Inglés de Trabajo</span></div>
-  <div class="stats"><span class="pill lvl" id="hdr-lvl">B1</span><span class="pill fire" id="hdr-streak">🔥 0</span><span class="pill xp" id="hdr-xp">⚡ 0</span></div>
+  <div class="hdr-top">
+    <div class="brand">🦉 <span id="hdr-brand">Inglés de Trabajo</span></div>
+    <div class="stats"><span class="pill lvl" id="hdr-lvl">B1</span><span class="pill fire" id="hdr-streak">🔥 0</span><span class="pill xp" id="hdr-xp">⚡ 0</span></div>
+  </div>
+  <div class="lang-switch" id="lang-switch" role="tablist" aria-label="Idioma de estudio">
+    <button type="button" role="tab" data-act="lang" data-v="en">Inglés</button>
+    <button type="button" role="tab" data-act="lang" data-v="cs">Checo</button>
+  </div>
 </header>
 <main id="main"></main>
 <nav>
