@@ -224,7 +224,7 @@ LEVELS.forEach((l) => {
 */
 const CS_LEVELS = ["A1"];
 const CS_LVL_LABEL = { A1: "A0–A1 Supervivencia" };
-const CS_THEMES = ["saludos", "numeros", "transporte", "compras", "vivienda", "trabajo", "emergencias"];
+const CS_THEMES = ["saludos", "numeros", "transporte", "compras", "vivienda", "trabajo", "emergencias", "curso-1", "curso-2", "curso-3", "curso-4", "curso-5", "curso-6", "curso-7"];
 const CS_TH_LABEL = {
   saludos: "Saludos y cortesía",
   numeros: "Números y dinero",
@@ -233,6 +233,13 @@ const CS_TH_LABEL = {
   vivienda: "Vivienda / arriendo",
   trabajo: "Trabajo (primer día)",
   emergencias: "Emergencias y salud",
+  "curso-1": "Clase 1 · Pronunciación",
+  "curso-2": "Clase 2 · Presentaciones",
+  "curso-3": "Clase 3 · Verbo být",
+  "curso-4": "Clase 4 · Números 0–10",
+  "curso-5": "Clase 5 · Jídlo (comida)",
+  "curso-6": "Clase 6 · Verbo bydlet",
+  "curso-7": "Clase 7 · Rodina (familia)",
 };
 
 // [checo, español, pronunciación, ejemplo checo, ejemplo español]
@@ -339,6 +346,134 @@ const CS_WORDS = {
     ["alergie", "alergia", "álergie", "Mám alergii.", "Tengo una alergia."],
     ["toaleta", "baño / servicio", "tóaleta", "Kde je toaleta?", "¿Dónde está el baño?"],
   ],
+  // Mi curso (Czech Unlocked) — un tema por unidad del Padlet
+  "curso-1": [
+    ["matka", "madre", "matka", "To je moje matka.", "Esa es mi madre."],
+    ["máma", "mamá", "máma", "Máma je doma.", "Mamá está en casa."],
+    ["já", "yo", "yá", "Já jsem Víctor.", "Yo soy Víctor."],
+    ["vy", "usted / ustedes / vosotros", "vi", "Jak se máte vy?", "¿Cómo está usted?"],
+    ["žena", "mujer", "zhena", "Ta žena je učitelka.", "Esa mujer es profesora."],
+    ["něco", "algo", "njétso", "Chceš něco k pití?", "¿Quieres algo para beber?"],
+    ["zítra", "mañana (el día siguiente)", "zítra", "Zítra jdu do školy.", "Mañana voy a la escuela."],
+    ["škola", "escuela", "shkola", "Kde je škola?", "¿Dónde está la escuela?"],
+    ["centrum", "centro", "tséntrum", "Bydlím v centru.", "Vivo en el centro."],
+    ["hotel", "hotel", "hotel", "Hotel je v centru.", "El hotel está en el centro."],
+    ["čokoláda", "chocolate", "chokoláda", "Mám rád čokoládu.", "Me gusta el chocolate."],
+    ["chleba", "pan", "jleba", "Chleba je na stole.", "El pan está en la mesa."],
+    ["dělám", "(yo) hago / estoy haciendo", "djelám", "Dělám domácí úkol.", "Hago la tarea."],
+    ["těší mě", "encantado / mucho gusto", "tyéshi mnye", "Těší mě, jsem Kate.", "Mucho gusto, soy Kate."],
+    ["kofola", "Kofola (refresco checo)", "kofola", "Dáš si kofolu?", "¿Quieres una Kofola?"],
+    ["smažený sýr", "queso frito (plato checo)", "smažení sír", "Dám si smažený sýr.", "Voy a pedir queso frito."],
+    ["knedlíky", "knedlíks (dumplings checos)", "knedlíki", "Guláš s knedlíky.", "Gulash con knedlíks."],
+    ["kapr", "carpa (típica de Navidad)", "kapr", "Na Vánoce jíme kapra.", "En Navidad comemos carpa."],
+    ["pomlázka", "pomlázka (vara de Pascua)", "pomlázka", "To je pomlázka.", "Eso es una pomlázka."],
+    ["Krteček", "el Topito (personaje checo)", "krtéchek", "Krteček je český film.", "El Topito es una película checa."]
+  ],
+  "curso-2": [
+    ["Ahoj", "hola (informal)", "ájoy", "Ahoj, jak se jmenuješ?", "Hola, ¿cómo te llamas?"],
+    ["Čau", "hola / chao (muy informal)", "chau", "Čau, jsem Pedro.", "Hola, soy Pedro."],
+    ["jak se jmenuješ?", "¿cómo te llamas?", "yak se jmenuyesh", "Ahoj, jak se jmenuješ?", "Hola, ¿cómo te llamas?"],
+    ["jmenuju se", "me llamo (forma coloquial de jmenuji se)", "jmenuyu se", "Jmenuju se Víctor.", "Me llamo Víctor."],
+    ["jsem", "soy / estoy (yo)", "ysem", "Jsem Kate.", "Soy Kate."],
+    ["a ty?", "¿y tú?", "a ti", "Jsem Pedro, a ty?", "Soy Pedro, ¿y tú?"],
+    ["odkud jsi?", "¿de dónde eres?", "odkut ysi", "Odkud jsi?", "¿De dónde eres?"],
+    ["jsem z…", "soy de…", "ysem z", "Jsem z Chile.", "Soy de Chile."],
+    ["co děláš?", "¿qué haces? / ¿a qué te dedicas?", "tso djelásh", "Co děláš v Česku?", "¿Qué haces en Chequia?"],
+    ["učitelka", "profesora", "úchitelka", "Jsem učitelka.", "Soy profesora."],
+    ["ekonom", "economista", "ekonom", "Já jsem ekonom.", "Yo soy economista."],
+    ["Česko", "Chequia / República Checa", "chesko", "Co děláš v Česku?", "¿Qué haces en Chequia?"],
+    ["Praha", "Praga", "praha", "Bydlím v Praze.", "Vivo en Praga."],
+    ["Brno", "Brno", "brno", "Bydlíš v Brně?", "¿Vives en Brno?"]
+  ],
+  "curso-3": [
+    ["já", "yo", "yá", "Já jsem z Chile.", "Yo soy de Chile."],
+    ["ty", "tú", "ti", "Ty jsi z USA.", "Tú eres de Estados Unidos."],
+    ["on", "él", "on", "On je z Česka.", "Él es de Chequia."],
+    ["ona", "ella", "ona", "Ona je učitelka.", "Ella es profesora."],
+    ["to", "eso / ello / eso es", "to", "To je z Belgie.", "Eso es de Bélgica."],
+    ["my", "nosotros / nosotras", "mi", "My jsme z Texasu.", "Nosotros somos de Texas."],
+    ["vy", "usted / ustedes / vosotros", "vi", "Vy jste z Prahy.", "Ustedes son de Praga."],
+    ["oni / ony", "ellos / ellas", "oni / oni", "Oni jsou z Oregonu.", "Ellos son de Oregón."],
+    ["já jsem", "yo soy / estoy", "yá ysem", "Já jsem Martin.", "Yo soy Martin."],
+    ["ty jsi", "tú eres / estás", "ti ysi", "Ty jsi aktivní.", "Tú eres activo."],
+    ["on/ona/to je", "él/ella/eso es o está", "on / ona / to ye", "Ona je dobrá.", "Ella es buena."],
+    ["my jsme", "nosotros somos / estamos", "mi ysme", "My jsme v USA.", "Nosotros estamos en Estados Unidos."],
+    ["vy jste", "usted es / ustedes son o están", "vi yste", "Vy jste z Kanady.", "Ustedes son de Canadá."],
+    ["oni jsou", "ellos son / están", "oni ysou", "Oni jsou z Oregonu.", "Ellos son de Oregón."],
+    ["já nejsem", "yo no soy / no estoy", "yá neysem", "Já nejsem z Brna.", "Yo no soy de Brno."],
+    ["ty nejsi", "tú no eres / no estás", "ti neysi", "Ty nejsi z Prahy.", "Tú no eres de Praga."],
+    ["není", "no es / no está (él, ella, eso)", "není", "To není hotel.", "Eso no es un hotel."],
+    ["my nejsme", "nosotros no somos / no estamos", "mi neysme", "My nejsme z USA.", "Nosotros no somos de Estados Unidos."],
+    ["vy nejste", "usted no es / ustedes no son", "vi neyste", "Vy nejste z Česka.", "Ustedes no son de Chequia."],
+    ["oni nejsou", "ellos no son / no están", "oni neysou", "Oni nejsou doma.", "Ellos no están en casa."]
+  ],
+  "curso-4": [
+    ["nula", "cero", "nula", "To je nula.", "Eso es un cero."],
+    ["jedna", "uno / una", "yedna", "Jedna káva, prosím.", "Un café, por favor."],
+    ["dva", "dos (forma del curso; también existe dvě)", "dva", "Dva rohlíky, prosím.", "Dos panecillos, por favor."],
+    ["tři", "tres", "trzhi", "Tři piva, prosím.", "Tres cervezas, por favor."],
+    ["čtyři", "cuatro", "chtírzhi", "Čtyři knedlíky.", "Cuatro knedlíks."],
+    ["pět", "cinco", "pyet", "Pět korun.", "Cinco coronas."],
+    ["šest", "seis", "shest", "Šest studentů.", "Seis estudiantes."],
+    ["sedm", "siete", "sedm", "Sedm dní.", "Siete días."],
+    ["osm", "ocho", "osm", "Osm hodin.", "Las ocho / ocho horas."],
+    ["devět", "nueve", "devyet", "Devět škol.", "Nueve escuelas."],
+    ["deset", "diez", "déset", "Deset korun.", "Diez coronas."]
+  ],
+  "curso-5": [
+    ["jídlo", "comida", "yídlo", "Jídlo je výborné.", "La comida está excelente."],
+    ["máš hlad?", "¿tienes hambre?", "másh hlad", "Máš hlad?", "¿Tienes hambre?"],
+    ["něco k pití?", "¿algo para beber?", "njétso k pití", "Něco k pití?", "¿Algo para beber?"],
+    ["salát", "ensalada", "salát", "Dám si salát.", "Voy a pedirme una ensalada."],
+    ["řízek", "milanesa / schnitzel", "rzhízek", "Řízek je typicky český.", "El řízek es típicamente checo."],
+    ["chleba", "pan", "jleba", "Chleba a máslo.", "Pan y mantequilla."],
+    ["rohlík", "panecillo (rohlík)", "rohlík", "Dva rohlíky, prosím.", "Dos panecillos, por favor."],
+    ["ryba", "pescado", "riba", "Dám si rybu.", "Voy a pedirme pescado."],
+    ["polévka", "sopa", "polévka", "Polévka je horká.", "La sopa está caliente."],
+    ["rýže", "arroz", "rízhe", "Rýže nebo brambory?", "¿Arroz o papas?"],
+    ["pizza", "pizza", "pitsa", "Dáte si pizzu?", "¿Van a pedir pizza?"],
+    ["steak", "bistec", "stejk", "Já si dám steak.", "Yo voy a pedirme un bistec."],
+    ["volské oko", "huevo frito", "volské oko", "Snídaně: volské oko.", "Desayuno: huevo frito."],
+    ["kuře", "pollo", "kúrzhe", "Pečené kuře.", "Pollo asado."],
+    ["ovoce", "fruta", "ovotse", "Mám rád ovoce.", "Me gusta la fruta."],
+    ["hranolky", "papas fritas", "hranolki", "Hranolky k řízku.", "Papas fritas con el řízek."],
+    ["brambory", "papas", "brambori", "Brambory nebo rýže?", "¿Papas o arroz?"],
+    ["těstoviny", "pasta", "tyestovini", "Dám si těstoviny.", "Voy a pedirme pasta."],
+    ["knedlíky", "knedlíks (dumplings checos)", "knedlíki", "Guláš s knedlíky, prosím.", "Gulash con knedlíks, por favor."],
+    ["pivo", "cerveza", "pivo", "Jedno pivo, prosím.", "Una cerveza, por favor."],
+    ["víno", "vino", "víno", "Červené víno, prosím.", "Vino tinto, por favor."],
+    ["voda", "agua", "voda", "Vodu, prosím.", "Agua, por favor."],
+    ["limonáda", "limonada", "limonáda", "Dáte si limonádu?", "¿Quiere una limonada?"],
+    ["káva", "café", "káva", "Jedna káva, prosím.", "Un café, por favor."],
+    ["čaj", "té", "chai", "Čaj s citronem.", "Té con limón."]
+  ],
+  "curso-6": [
+    ["bydlet", "vivir / habitar", "bidlet", "Kde bydlíš?", "¿Dónde vives?"],
+    ["já bydlím", "yo vivo", "yá bidlím", "Já bydlím v Brně.", "Yo vivo en Brno."],
+    ["ty bydlíš", "tú vives", "ti bidlísh", "Kde bydlíš ty?", "¿Dónde vives tú?"],
+    ["on/ona bydlí", "él / ella vive", "on / ona bidlí", "Moje babička bydlí v Praze.", "Mi abuela vive en Praga."],
+    ["my bydlíme", "nosotros vivimos", "mi bidlíme", "My bydlíme v Argentině.", "Nosotros vivimos en Argentina."],
+    ["vy bydlíte", "usted vive / ustedes viven", "vi bidlíte", "Dobrý den, kde bydlíte?", "Buenos días, ¿dónde vive usted?"],
+    ["oni bydlí", "ellos viven", "oni bidlí", "Oni bydlí v Ostravě.", "Ellos viven en Ostrava."],
+    ["nebydlím", "no vivo", "nebidlím", "Ne, já nebydlím v Praze.", "No, yo no vivo en Praga."],
+    ["kde bydlíš?", "¿dónde vives?", "gde bidlísh", "Kde bydlíš?", "¿Dónde vives?"],
+    ["Ostrava", "Ostrava", "ostrava", "Ty bydlíš v Ostravě?", "¿Vives en Ostrava?"]
+  ],
+  "curso-7": [
+    ["rodina", "familia", "rodina", "To je moje rodina.", "Esta es mi familia."],
+    ["máma / maminka", "mamá", "máma / maminka", "To je moje máma.", "Esta es mi mamá."],
+    ["táta / tatínek", "papá", "táta / tatínek", "Můj táta bydlí v Praze.", "Mi papá vive en Praga."],
+    ["babička", "abuela", "bábichka", "Moje babička bydlí v Praze.", "Mi abuela vive en Praga."],
+    ["děda / dědeček", "abuelo", "dyéda / dyédechek", "To je můj dědeček.", "Este es mi abuelo."],
+    ["sestra", "hermana", "sestra", "Kde bydlí tvoje sestra?", "¿Dónde vive tu hermana?"],
+    ["bratr", "hermano", "bratr", "Mám bratra.", "Tengo un hermano."],
+    ["strýc / strejda", "tío", "stríts / streida", "To je můj strýc.", "Este es mi tío."],
+    ["teta", "tía", "teta", "Moje teta bydlí v Brně.", "Mi tía vive en Brno."],
+    ["sestřenice", "prima", "sestrzheñitse", "To je moje sestřenice.", "Esta es mi prima."],
+    ["rodiče", "padres", "ródiche", "Moji rodiče bydlí v Chile.", "Mis padres viven en Chile."],
+    ["děti", "hijos / niños", "dyeti", "Mají dvě děti.", "Tienen dos hijos."]
+  ]
+,
 };
 
 // [checo, español, pronunciación]
@@ -400,6 +535,78 @@ const CS_SENTS = {
     ["Mám cestovní pojištění.", "Tengo seguro de viaje.", "mam tséstovñí poyishtyení"],
     ["Kde je toaleta?", "¿Dónde está el baño?", "gde ye tóaleta"],
   ],
+  // Mi curso (Czech Unlocked)
+  "curso-1": [
+    ["Těší mě!", "¡Mucho gusto!", "tyéshi mnye"],
+    ["Zítra jdu do školy.", "Mañana voy a la escuela.", "zítra ydu do shkoli"],
+    ["Dělám domácí úkol.", "Hago la tarea.", "djelám domátsí úkol"],
+    ["Chleba je na stole.", "El pan está en la mesa.", "jleba ye na stole"],
+    ["To je čokoláda.", "Eso es chocolate.", "to ye chokoláda"]
+  ],
+  "curso-2": [
+    ["Ahoj, jak se jmenuješ?", "Hola, ¿cómo te llamas?", "ájoy, yak se jmenuyesh"],
+    ["Čau, jsem Pedro a ty?", "Hola, soy Pedro, ¿y tú?", "chau, ysem pedro a ti"],
+    ["Já jsem Kate, těší mě!", "Yo soy Kate, ¡mucho gusto!", "yá ysem kate, tyéshi mnye"],
+    ["Odkud jsi?", "¿De dónde eres?", "odkut ysi"],
+    ["Z USA, odkud jsi ty?", "De Estados Unidos, ¿y tú de dónde eres?", "z ú-es-á, odkut ysi ti"],
+    ["Já z Mexika. Co děláš v Česku?", "Yo de México. ¿Qué haces en Chequia?", "yá z meksika. tso djelásh f chesku"],
+    ["Jsem učitelka a ty?", "Soy profesora, ¿y tú?", "ysem úchitelka a ti"],
+    ["Já jsem ekonom.", "Yo soy economista.", "yá ysem ekonom"],
+    ["A taky bydlíš v Brně?", "¿Y tú también vives en Brno?", "a taki bidlísh v brnye"],
+    ["Ne, bydlím v Praze.", "No, vivo en Praga.", "ne, bidlím v praze"],
+    ["Jmenuju se Víctor.", "Me llamo Víctor.", "jmenuyu se víktor"],
+    ["Jsem z Chile.", "Soy de Chile.", "ysem z chile"]
+  ],
+  "curso-3": [
+    ["Já jsem z Kanady.", "Yo soy de Canadá.", "yá ysem z kanadi"],
+    ["Ty jsi z USA.", "Tú eres de Estados Unidos.", "ti ysi z ú-es-á"],
+    ["On je z Česka.", "Él es de Chequia.", "on ye z cheska"],
+    ["Ona je z Francie.", "Ella es de Francia.", "ona ye z frantsiye"],
+    ["To je z Belgie.", "Eso es de Bélgica.", "to ye z belgiye"],
+    ["My jsme z Texasu.", "Nosotros somos de Texas.", "mi ysme z texasu"],
+    ["Vy jste ze Severní Karolíny.", "Ustedes son de Carolina del Norte.", "vi yste ze severñí karolíni"],
+    ["Oni jsou z Oregonu.", "Ellos son de Oregón.", "oni ysou z oregonu"],
+    ["Já jsem Martin.", "Yo soy Martin.", "yá ysem martin"],
+    ["Ona je dobrá.", "Ella es buena.", "ona ye dobrá"],
+    ["Já nejsem z Brna.", "Yo no soy de Brno.", "yá neysem z brna"],
+    ["To není hotel.", "Eso no es un hotel.", "to není hotel"]
+  ],
+  "curso-4": [
+    ["Jedna káva, prosím.", "Un café, por favor.", "yedna káva, prósim"],
+    ["Dva rohlíky, prosím.", "Dos panecillos, por favor.", "dva rohlíki, prósim"],
+    ["Tři piva, prosím.", "Tres cervezas, por favor.", "trzhi piva, prósim"],
+    ["To je nula.", "Eso es un cero.", "to ye nula"],
+    ["Deset korun.", "Diez coronas.", "déset kórun"]
+  ],
+  "curso-5": [
+    ["Máš hlad?", "¿Tienes hambre?", "másh hlad"],
+    ["Něco k pití?", "¿Algo para beber?", "njétso k pití"],
+    ["Jedno pivo, prosím.", "Una cerveza, por favor.", "yedno pivo, prósim"],
+    ["Jedna káva, prosím.", "Un café, por favor.", "yedna káva, prósim"],
+    ["Dám si řízek s hranolky.", "Voy a pedirme řízek con papas fritas.", "dám si rzhízek s hranolki"],
+    ["Guláš s knedlíky, prosím.", "Gulash con knedlíks, por favor.", "gulásh s knedlíki, prósim"],
+    ["Vodu, prosím.", "Agua, por favor.", "vodu, prósim"]
+  ],
+  "curso-6": [
+    ["Já bydlím v Brně.", "Yo vivo en Brno.", "yá bidlím v brnye"],
+    ["Kde bydlíš ty?", "¿Dónde vives tú?", "gde bidlísh ti"],
+    ["Moje babička bydlí v Praze.", "Mi abuela vive en Praga.", "moye bábichka bidlí v praze"],
+    ["Kde bydlí tvoje sestra?", "¿Dónde vive tu hermana?", "gde bidlí tvoye sestra"],
+    ["Dobrý den, kde bydlíte?", "Buenos días, ¿dónde vive usted?", "dóbri den, gde bidlíte"],
+    ["Ahoj, ty bydlíš v Ostravě?", "Hola, ¿tú vives en Ostrava?", "ájoy, ti bidlísh v ostravye"],
+    ["Ne, já nebydlím v Praze.", "No, yo no vivo en Praga.", "ne, yá nebidlím v praze"],
+    ["Bydlím v Praze.", "Vivo en Praga.", "bidlím v praze"]
+  ],
+  "curso-7": [
+    ["To je moje rodina.", "Esta es mi familia.", "to ye moye rodina"],
+    ["To je moje máma.", "Esta es mi mamá.", "to ye moye máma"],
+    ["To je můj táta.", "Este es mi papá.", "to ye muy táta"],
+    ["To je moje babička.", "Esta es mi abuela.", "to ye moye bábichka"],
+    ["To je můj dědeček.", "Este es mi abuelo.", "to ye muy dyédechek"],
+    ["Mám bratra a sestru.", "Tengo un hermano y una hermana.", "mám bratra a sestru"],
+    ["Moji rodiče bydlí v Chile.", "Mis padres viven en Chile.", "moyi ródiche bidlí v chile"]
+  ]
+,
 };
 
 const CS_ALL_WORDS = [];

@@ -103,14 +103,22 @@ const pron = item => item && item.pron ? `<div class="w-pron">${esc(item.pron)}<
 function seg(name, opts, val) {
   return `<div class="seg">${opts.map(([v, l]) => `<button class="${v === val ? "on" : ""}" data-act="seg" data-k="${name}" data-v="${v}">${l}</button>`).join("")}</div>`;
 }
+function themeOptions() {
+  const opt = (v, l) => `<option value="${v}" ${v === ui.th ? "selected" : ""}>${l}</option>`;
+  if (!isCs()) {
+    return opt("todos", "Todos los temas") + THEMES.map(t => opt(t, TH_LABEL[t])).join("");
+  }
+  const surv = ["saludos", "numeros", "transporte", "compras", "vivienda", "trabajo", "emergencias"];
+  const curso = ["curso-1", "curso-2", "curso-3", "curso-4", "curso-5", "curso-6", "curso-7"];
+  return opt("todos", "Todos los temas") +
+    `<optgroup label="Supervivencia">${surv.map(t => opt(t, CS_TH_LABEL[t])).join("")}</optgroup>` +
+    `<optgroup label="Mi curso (Czech Unlocked)">${curso.map(t => opt(t, CS_TH_LABEL[t])).join("")}</optgroup>`;
+}
 function pickers() {
-  const themes = isCs() ? CS_THEMES : THEMES;
-  const labels = isCs() ? CS_TH_LABEL : TH_LABEL;
   const lvl = isCs()
-    ? `<p class="small">Nivel: A0–A1 Supervivencia · pistas de pronunciación en español</p>`
+    ? `<p class="small">Nivel: A0–A1 · Supervivencia y tu curso Czech Unlocked · pistas de pronunciación en español</p>`
     : seg("lvl", LEVELS.map(l => [l, LVL_LABEL[l]]), save.lvl);
-  return lvl +
-    `<label class="sel">Tema <select data-act="theme">${[["todos", "Todos los temas"], ...themes.map(t => [t, labels[t]])].map(([v, l]) => `<option value="${v}" ${v === ui.th ? "selected" : ""}>${l}</option>`).join("")}</select></label>`;
+  return lvl + `<label class="sel">Tema <select data-act="theme">${themeOptions()}</select></label>`;
 }
 
 function csStats() {
@@ -144,7 +152,7 @@ function viewInicio() {
       <p class="small">${todayXp} / ${save.goal} XP hoy · ${goalMet ? "¡Meta del día cumplida! 🎉" : `Te faltan ${save.goal - todayXp} XP`}</p>
     </div>
   </section>
-  ${isCs() ? `<p class="hint"><b>Checo de supervivencia (A0–A1)</b> para tu llegada a Chequia. Las pistas se leen como en español. Además: <b>sh</b> como en show, <b>j</b> como jota, <b>rzh</b> es la ř checa, <b>c</b> suena ts, <b>ň</b> como ñ, <b>y</b> suena i, <b>ě</b> suena ye (o nye después de n o m).</p>` : ""}
+  ${isCs() ? `<p class="hint"><b>Checo de supervivencia (A0–A1)</b> para tu llegada a Chequia, más el vocabulario de <b>Mi curso (Czech Unlocked)</b>. Las pistas se leen como en español. Además: <b>sh</b> como en show, <b>j</b> como jota, <b>rzh</b> es la ř checa, <b>c</b> suena ts, <b>ň</b> como ñ, <b>y</b> suena i, <b>ě</b> suena ye (o nye después de n o m).</p>` : ""}
   <div class="row2">
     <button class="big green" data-act="tab" data-v="vocab">📚 Practicar vocabulario</button>
     <button class="big blue" data-act="tab" data-v="frases">💬 Practicar oraciones</button>
