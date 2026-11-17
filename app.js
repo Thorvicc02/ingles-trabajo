@@ -21,18 +21,66 @@ function load() {
 }
 function canPersist() { try { const s = store(); s.setItem(KEY + ":t", "1"); s.removeItem(KEY + ":t"); return true; } catch (e) { return false; } }
 function persist() { try { store().setItem(KEY, JSON.stringify(save)); } catch (e) {} }
-function speak(t) {
+/* Un solo <audio> reutilizado: en iOS Safari el play() tiene que
+   arrancar desde el toque del usuario, y crear un Audio nuevo a veces falla. */
+let sharedAudio = null;
+function getSharedAudio() {
+  if (!sharedAudio) {
+    sharedAudio = document.getElementById("tts-player") || new Audio();
+    sharedAudio.setAttribute("playsinline", "");
+    sharedAudio.setAttribute("webkit-playsinline", "");
+    sharedAudio.playsInline = true;
+    sharedAudio.preload = "auto";
+    if (!sharedAudio.isConnected) document.body.appendChild(sharedAudio);
+  }
+  return sharedAudio;
+}
+function pickFemaleVoice(lang) {
+  if (!("speechSynthesis" in window)) return null;
+  const voices = speechSynthesis.getVoices() || [];
+  const isEn = /^en/i.test(lang);
+  const names = isEn
+    ? [/samantha/i, /ava\s*\(.*premium/i, /ava\s*\(.*enhanced/i, /\bava\b/i, /aria/i, /jenny/i, /allison/i, /zoe/i, /nicky/i, /susan/i, /victoria/i, /karen/i, /moira/i, /tessa/i, /fiona/i, /salli/i, /female/i]
+    : [/zuzana/i, /vlasta/i, /female/i];
+  const langRe = isEn ? /^en/i : /^cs/i;
+  const exactRe = isEn ? /^en[-_]US/i : /^cs[-_]CZ/i;
+  const pool = voices.filter(v => langRe.test(v.lang));
+  for (const re of names) {
+    const hit = pool.find(v => re.test(v.name));
+    if (hit) return hit;
+  }
+  return pool.find(v => exactRe.test(v.lang)) || pool[0] || null;
+}
+function speakFallback(t) {
   try {
     if (!t || !("speechSynthesis" in window)) return;
     const want = isCs() ? "cs-CZ" : "en-US";
-    const pref = isCs() ? /^cs/i : /^en/i;
-    const exact = isCs() ? /^cs[-_]CZ/i : /^en[-_]US/i;
-    const u = new SpeechSynthesisUtterance(t); u.lang = want; u.rate = 0.9;
-    const voices = speechSynthesis.getVoices();
-    const v = voices.find(v => exact.test(v.lang)) || voices.find(v => pref.test(v.lang));
+    const u = new SpeechSynthesisUtterance(t);
+    u.lang = want;
+    u.rate = 0.9;
+    const v = pickFemaleVoice(want);
     if (v) u.voice = v;
-    speechSynthesis.cancel(); speechSynthesis.speak(u);
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
   } catch (e) {}
+}
+function audioSrc(id, kind) {
+  const lang = isCs() ? "cs" : "en";
+  const suffix = kind === "ex" ? "-ex" : kind === "s" ? "-s" : "";
+  return `audio/${lang}/${encodeURIComponent(id)}${suffix}.mp3`;
+}
+function speak(t, id, kind) {
+  if (!t) return;
+  try { if ("speechSynthesis" in window) speechSynthesis.cancel(); } catch (e) {}
+  if (!id) { speakFallback(t); return; }
+  const el = getSharedAudio();
+  try { el.pause(); } catch (e) {}
+  let usedFallback = false;
+  const fail = () => { if (usedFallback) return; usedFallback = true; speakFallback(t); };
+  el.onerror = fail;
+  el.src = audioSrc(id, kind);
+  const p = el.play();
+  if (p && p.catch) p.catch(fail);
 }
 const pad = n => String(n).padStart(2, "0");
 const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -98,7 +146,7 @@ function sentOk(id, n) { const first = !save.sents[id]; save.sents = Object.assi
 
 /* ---------- vistas ---------- */
 const bar = (pct, cls = "") => `<div class="bar ${cls}"><div style="width:${Math.max(0, Math.min(100, pct))}%"></div></div>`;
-const spk = t => `<button class="spk" data-act="speak" data-t="${esc(t)}" aria-label="Escuchar">🔊 Escuchar</button>`;
+const spk = (t, id, kind) => `<button type="button" class="spk" data-act="speak" data-t="${esc(t)}" data-id="${esc(id || "")}" data-kind="${esc(kind || "")}" aria-label="Escuchar">🔊 Escuchar</button>`;
 const pron = item => item && item.pron ? `<div class="w-pron">${esc(item.pron)}</div>` : "";
 function seg(name, opts, val) {
   return `<div class="seg">${opts.map(([v, l]) => `<button class="${v === val ? "on" : ""}" data-act="seg" data-k="${name}" data-v="${v}">${l}</button>`).join("")}</div>`;
@@ -208,8 +256,8 @@ function viewFlash(words) {
   if (!w) return h + `<div class="card center"><div style="font-size:40px">🎉</div><h3>¡Dominaste todas las palabras de esta selección!</h3><p class="small">Apaga “Solo pendientes” para repasarlas, o prueba otro tema o nivel.</p></div>`;
   h += `<div class="flash ${f.flipped ? "back" : ""}" data-act="flip" role="button" tabindex="0">
     <span class="small">${thLabelOf(w.th)} · ${f.idx % deck.length + 1}/${deck.length}</span>
-    ${!f.flipped ? `<div class="w-en">${esc(w.en)}</div>${pron(w)}${spk(w.en)}<span class="small">Toca la tarjeta para ver el significado</span>`
-      : `<div class="w-es">${esc(w.es)}</div>${pron(w)}<div class="w-ex">“${esc(w.ex)}”</div>${w.exes ? `<div class="small">${esc(w.exes)}</div>` : ""}${spk(w.ex)}`}
+    ${!f.flipped ? `<div class="w-en">${esc(w.en)}</div>${pron(w)}${spk(w.en, w.id)}<span class="small">Toca la tarjeta para ver el significado</span>`
+      : `<div class="w-es">${esc(w.es)}</div>${pron(w)}<div class="w-ex">“${esc(w.ex)}”</div>${w.exes ? `<div class="small">${esc(w.exes)}</div>` : ""}${spk(w.ex, w.id, "ex")}`}
   </div>
   <div class="row2"><button class="big red" data-act="mark" data-v="0">Repasar de nuevo</button><button class="big green" data-act="mark" data-v="1">Lo sé ✓</button></div>
   ${known[w.id] ? `<p class="small ok center">Ya marcaste esta palabra como aprendida</p>` : ""}`;
@@ -235,7 +283,7 @@ function viewQuiz() {
   const q = z.qs[z.qi];
   return `${bar(z.qi / z.qs.length * 100)}
   <p class="small">Pregunta ${z.qi + 1} de ${z.qs.length} · ${q.dir === "en-es" ? "¿Qué significa en español?" : `¿Cómo se dice en ${langName()}?`}</p>
-  <div class="card center"><div class="w-en">${esc(q.dir === "en-es" ? q.w.en : q.w.es)}</div>${q.dir === "en-es" ? `${pron(q.w)}${spk(q.w.en)}` : ""}</div>
+  <div class="card center"><div class="w-en">${esc(q.dir === "en-es" ? q.w.en : q.w.es)}</div>${q.dir === "en-es" ? `${pron(q.w)}${spk(q.w.en, q.w.id)}` : ""}</div>
   <div class="opts">${q.options.map((o, i) => { const s = z.picked === null ? "" : i === q.ans ? "right" : i === z.picked ? "wrong" : "dim";
     return `<button class="opt ${s}" data-act="qpick" data-v="${i}" ${z.picked !== null ? "disabled" : ""}>${esc(o)}</button>`; }).join("")}</div>
   ${z.picked !== null ? `<div class="feedback ${z.picked === q.ans ? "good" : "bad"}"><b>${z.picked === q.ans ? "¡Correcto! +10 XP" : `Era: ${esc(q.options[q.ans])}`}</b><button class="big ${z.picked === q.ans ? "green" : "red"}" data-act="qnext">${z.qi + 1 >= z.qs.length ? "Ver resultado" : "Siguiente"}</button></div>` : ""}`;
@@ -243,7 +291,7 @@ function viewQuiz() {
 
 function viewStudy(sents) {
   return `<label class="tog"><input type="checkbox" data-act="tr" ${ui.st.tr ? "checked" : ""}> Mostrar traducción</label>
-  ${sents.map(s => `<div class="card sent"><div class="s-en">${esc(s.en)} ${save.sents[s.id] ? "✅" : ""}</div>${pron(s)}${ui.st.tr ? `<div class="small">${esc(s.es)}</div>` : ""}<div class="small muted">${thLabelOf(s.th)}</div>${spk(s.en)}</div>`).join("")}`;
+  ${sents.map(s => `<div class="card sent"><div class="s-en">${esc(s.en)} ${save.sents[s.id] ? "✅" : ""}</div>${pron(s)}${ui.st.tr ? `<div class="small">${esc(s.es)}</div>` : ""}<div class="small muted">${thLabelOf(s.th)}</div>${spk(s.en, s.id, "s")}</div>`).join("")}`;
 }
 function chooseOpts(s, bank) {
   const wrong = shuffle(bank.filter(b => b.id !== s.id), hash(s.id)).slice(0, 2).map(b => b.en);
@@ -255,7 +303,7 @@ function viewChoose(sents, bank) {
   <div class="card center"><p class="small">¿Cómo se dice en ${langName()}?</p><div class="s-es">${esc(s.es)}</div></div>
   <div class="opts">${options.map((o, i) => { const st = c.picked === null ? "" : i === ans ? "right" : i === c.picked ? "wrong" : "dim";
     return `<button class="opt ${st}" data-act="cpick" data-v="${i}" data-ans="${ans}" data-id="${s.id}" ${c.picked !== null ? "disabled" : ""}>${esc(o)}</button>`; }).join("")}</div>
-  ${c.picked !== null ? `<div class="feedback ${c.picked === ans ? "good" : "bad"}"><b>${c.picked === ans ? "¡Correcto!" : "Casi. La correcta está en verde."}</b>${pron(s)}${spk(s.en)}<button class="big ${c.picked === ans ? "green" : "red"}" data-act="cnext">Siguiente</button></div>` : ""}`;
+  ${c.picked !== null ? `<div class="feedback ${c.picked === ans ? "good" : "bad"}"><b>${c.picked === ans ? "¡Correcto!" : "Casi. La correcta está en verde."}</b>${pron(s)}${spk(s.en, s.id, "s")}<button class="big ${c.picked === ans ? "green" : "red"}" data-act="cnext">Siguiente</button></div>` : ""}`;
 }
 function orderWords(s) {
   const w = s.en.split(" "); let order = shuffle(w.map((_, i) => i), hash(s.id));
@@ -268,7 +316,7 @@ function viewOrder(sents) {
   <div class="card center"><p class="small">Ordena las palabras para traducir:</p><div class="s-es">${esc(s.es)}</div></div>
   <div class="answer ${o.res || ""}">${o.pick.length ? o.pick.map((i, j) => `<button class="chip" data-act="unpick" data-v="${j}" ${o.res ? "disabled" : ""}>${esc(words[i])}</button>`).join("") : `<span class="small muted">Toca las palabras en orden…</span>`}</div>
   <div class="bank">${words.map((w, i) => `<button class="chip ${o.pick.includes(i) ? "used" : ""}" data-act="opick" data-v="${i}" ${o.pick.includes(i) || o.res ? "disabled" : ""}>${esc(w)}</button>`).join("")}</div>
-  ${o.res ? `<div class="feedback ${o.res === "ok" ? "good" : "bad"}"><b>${o.res === "ok" ? "¡Perfecto!" : `Correcta: ${esc(s.en)}`}</b>${pron(s)}${spk(s.en)}<button class="big ${o.res === "ok" ? "green" : "red"}" data-act="onext">Siguiente</button></div>`
+  ${o.res ? `<div class="feedback ${o.res === "ok" ? "good" : "bad"}"><b>${o.res === "ok" ? "¡Perfecto!" : `Correcta: ${esc(s.en)}`}</b>${pron(s)}${spk(s.en, s.id, "s")}<button class="big ${o.res === "ok" ? "green" : "red"}" data-act="onext">Siguiente</button></div>`
     : `<div class="row2"><button class="big gray" data-act="oclear">Borrar</button><button class="big green" data-act="ocheck" data-id="${s.id}" ${o.pick.length !== words.length ? "disabled" : ""}>Comprobar</button></div>`}`;
 }
 
@@ -321,7 +369,7 @@ function importProgress(file) {
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b || b.tagName === "SELECT" || b.tagName === "INPUT") return;
   const a = b.dataset.act, v = b.dataset.v;
-  if (a === "speak") { e.stopPropagation(); speak(b.dataset.t); return; }
+  if (a === "speak") { e.stopPropagation(); speak(b.dataset.t, b.dataset.id, b.dataset.kind); return; }
   switch (a) {
     case "tab": ui.tab = v; window.scrollTo(0, 0); break;
     case "lang": setLang(v); window.scrollTo(0, 0); break;
