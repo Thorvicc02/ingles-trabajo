@@ -69,18 +69,43 @@ function audioSrc(id, kind) {
   const suffix = kind === "ex" ? "-ex" : kind === "s" ? "-s" : "";
   return `audio/${lang}/${encodeURIComponent(id)}${suffix}.mp3`;
 }
+let speakGen = 0;
 function speak(t, id, kind) {
   if (!t) return;
   try { if ("speechSynthesis" in window) speechSynthesis.cancel(); } catch (e) {}
   if (!id) { speakFallback(t); return; }
   const el = getSharedAudio();
+  const gen = ++speakGen;
+  const src = audioSrc(id, kind);
   try { el.pause(); } catch (e) {}
+  el.onerror = null;
+  el.onplaying = null;
+  /* Solo caemos a speechSynthesis si el MP3 no existe de verdad (404/403).
+     AbortError (cambio de src, Range interrumpido) y errores transitorios
+     no deben disparar la voz robótica del sistema, ni superponerse al MP3. */
   let usedFallback = false;
-  const fail = () => { if (usedFallback) return; usedFallback = true; speakFallback(t); };
-  el.onerror = fail;
-  el.src = audioSrc(id, kind);
+  const fallbackIfMissing = () => {
+    if (gen !== speakGen || usedFallback) return;
+    fetch(src).then(r => {
+      if (gen !== speakGen || usedFallback) return;
+      if (r.status === 404 || r.status === 403) {
+        usedFallback = true;
+        speakFallback(t);
+      }
+    }).catch(() => {});
+  };
+  el.onplaying = () => {
+    if (gen !== speakGen) return;
+    try { if ("speechSynthesis" in window) speechSynthesis.cancel(); } catch (e) {}
+  };
+  el.onerror = fallbackIfMissing;
+  el.src = src;
   const p = el.play();
-  if (p && p.catch) p.catch(fail);
+  if (p && p.catch) p.catch(err => {
+    if (gen !== speakGen) return;
+    if (err && err.name === "AbortError") return;
+    fallbackIfMissing();
+  });
 }
 const pad = n => String(n).padStart(2, "0");
 const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
