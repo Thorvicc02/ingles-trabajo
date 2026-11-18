@@ -74,3 +74,18 @@ select{font-family:inherit;font-size:16px;font-weight:700;padding:10px;border-ra
 .hint{background:#FFF8E1;border:2px solid #FFE082;border-radius:16px;padding:12px 14px;font-size:14px;color:#5a3d00;line-height:1.45}
 .hint b{font-weight:900}
 .brand #hdr-brand{color:var(--ink)}
+
+.big.gold{background:var(--gold);--sh:#E0A800;color:#5a3d00}
+.feedback.mid{background:#FFF4CC;color:#7A5A00}
+.rate-btns{display:flex;flex-direction:column;gap:8px}
+.sent-input{width:100%;font-family:inherit;font-size:18px;font-weight:700;line-height:1.45;padding:14px;border-radius:16px;border:2px solid var(--line);min-height:104px;resize:vertical;color:var(--ink);background:#fff}
+.sent-input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px #DDF4FF}
+.sent-lab{width:100%}
+.sent-prompt .s-en{margin-top:6px;font-size:20px}
+.diff-line{font-size:18px;font-weight:700;line-height:1.7;flex-wrap:wrap}
+.dw{padding:1px 4px;border-radius:8px}
+.dw.ok{color:var(--green-d)}
+.dw.bad,.dw.extra{background:#FFDFE0;color:var(--red-d);text-decoration:line-through}
+.dw.miss{background:#FFF4CC;color:#7A5A00;text-decoration:underline}
+.sent-stats{margin:0}
+.seg button{font-size:13px;padding:9px 4px}

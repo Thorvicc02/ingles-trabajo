@@ -136,10 +136,19 @@ persist();
 const ui = { tab: "inicio", th: "todos", vMode: "tarjetas", sMode: "estudiar",
   fc: { idx: 0, flipped: false, pending: false },
   quiz: null, // {qs, qi, picked, score, done}
-  st: { tr: true },
+  st: { idx: 0, reveal: false, rated: false },
+  wr: { idx: 0, res: null },
   ch: { idx: 0, picked: null },
-  ord: { idx: 0, pick: [], res: null } };
-function resetSub() { ui.fc = { idx: 0, flipped: false, pending: ui.fc.pending }; ui.quiz = null; ui.ch = { idx: 0, picked: null }; ui.ord = { idx: 0, pick: [], res: null }; }
+  ord: { idx: 0, pick: [], res: null },
+  sFailedOnly: false };
+function resetSub() {
+  ui.fc = { idx: 0, flipped: false, pending: ui.fc.pending };
+  ui.quiz = null;
+  ui.st = { idx: 0, reveal: false, rated: false };
+  ui.wr = { idx: 0, res: null };
+  ui.ch = { idx: 0, picked: null };
+  ui.ord = { idx: 0, pick: [], res: null };
+}
 
 function isCs() { return save.lang === "cs"; }
 function langName() { return isCs() ? "checo" : "inglés"; }
@@ -151,7 +160,7 @@ const curWords = () => ui.th === "todos" ? wordsAll() : wordsAll().filter(w => w
 const curSents = () => ui.th === "todos" ? sentsAll() : sentsAll().filter(s => s.th === ui.th);
 function setLang(v) {
   if (v !== "en" && v !== "cs") return;
-  save.lang = v; persist(); ui.th = "todos"; resetSub();
+  save.lang = v; persist(); ui.th = "todos"; ui.sFailedOnly = false; resetSub();
 }
 
 let toastTimer;
@@ -167,7 +176,194 @@ function gain(n) {
   if (before < save.goal && before + n >= save.goal) setTimeout(() => toast("¡Meta del día cumplida! 🎉"), 1500);
 }
 function markWord(id, k) { const was = !!save.known[id]; save.known = Object.assign({}, save.known, { [id]: k }); gain(k ? (was ? 1 : 5) : 2); }
-function sentOk(id, n) { const first = !save.sents[id]; save.sents = Object.assign({}, save.sents, { [id]: true }); gain(first ? n : 2); }
+const MASTER_BOX = 5;
+const BOX_DAYS = { 1: 1, 2: 3, 3: 7, 4: 14, 5: 14 };
+function sentRec(id) {
+  const p = save.sents[id];
+  if (p === true) return { box: MASTER_BOX, due: "1970-01-01", reps: 1, lapses: 0 };
+  if (p && typeof p === "object") return p;
+  return null;
+}
+function isSentMastered(id) {
+  const r = sentRec(id);
+  return !!(r && r.box >= MASTER_BOX);
+}
+function isSentFailed(id) {
+  const r = sentRec(id);
+  return !!(r && r.grade === "again");
+}
+function sentStats(list) {
+  let mastered = 0, learning = 0, neu = 0;
+  for (const s of list) {
+    const r = sentRec(s.id);
+    if (!r) neu++;
+    else if (r.box >= MASTER_BOX) mastered++;
+    else learning++;
+  }
+  return { mastered, learning, neu };
+}
+function gradeSent(id, grade, xpFirst) {
+  const today = keyOf(new Date());
+  const prev = sentRec(id);
+  const r = prev ? Object.assign({}, prev) : { box: 0, reps: 0, lapses: 0 };
+  if (grade === "again") {
+    r.box = 1;
+    r.due = today;
+    r.lapses = (r.lapses || 0) + 1;
+  } else if (grade === "hard") {
+    r.box = prev && r.box > 1 ? Math.max(1, r.box - 1) : 1;
+    r.due = keyOf(addDays(new Date(), 1));
+  } else {
+    r.box = Math.min(MASTER_BOX, (r.box || 0) + 1);
+    r.due = keyOf(addDays(new Date(), BOX_DAYS[r.box] || 1));
+  }
+  r.reps = (r.reps || 0) + 1;
+  r.last = today;
+  r.grade = grade;
+  save.sents = Object.assign({}, save.sents, { [id]: r });
+  persist();
+  const firstGood = !prev || prev.grade === "again" || (prev.box || 0) < 2;
+  if (grade === "good") gain(firstGood ? (xpFirst || 10) : 2);
+  else if (grade === "hard") gain(!prev || prev.grade === "again" ? 5 : 1);
+}
+function sentOk(id, n) { gradeSent(id, "good", n); }
+
+function foldMarks(s) {
+  return String(s)
+    .replace(/[\u2018\u2019\u02BC\u00B4`]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\u2026/g, "...")
+    .replace(/\u00A0/g, " ");
+}
+function expandContractions(s) {
+  let t = s;
+  t = t.replace(/\bwon't\b/g, "will not");
+  t = t.replace(/\bcan't\b/g, "cannot");
+  t = t.replace(/\bshan't\b/g, "shall not");
+  t = t.replace(/\bain't\b/g, "is not");
+  t = t.replace(/\blet's\b/g, "let us");
+  t = t.replace(/\bo'clock\b/g, "oclock");
+  t = t.replace(/\bi'm\b/g, "i am");
+  t = t.replace(/\b([a-z]+)'re\b/g, "$1 are");
+  t = t.replace(/\b([a-z]+)'ve\b/g, "$1 have");
+  t = t.replace(/\b([a-z]+)'ll\b/g, "$1 will");
+  t = t.replace(/\b([a-z]+)'d\b/g, "$1 would");
+  t = t.replace(/\b([a-z]+)n't\b/g, "$1 not");
+  t = t.replace(/\b([a-z]+)'s\b/g, "$1 is");
+  t = t.replace(/\bcan not\b/g, "cannot");
+  const bare = { dont:"do not", doesnt:"does not", didnt:"did not", isnt:"is not", arent:"are not",
+    wasnt:"was not", werent:"were not", shouldnt:"should not", wouldnt:"would not", couldnt:"could not",
+    mustnt:"must not", wont:"will not", cant:"cannot", aint:"is not", shant:"shall not",
+    im:"i am", ive:"i have", youve:"you have", weve:"we have", theyve:"they have",
+    youre:"you are", theyre:"they are", thats:"that is", whats:"what is",
+    wheres:"where is", theres:"there is", heres:"here is", hows:"how is", whos:"who is" };
+  t = t.replace(/\b([a-z]+)\b/g, (m) => bare[m] || m);
+  t = t.replace(/\bcan not\b/g, "cannot");
+  return t;
+}
+function normSent(s) {
+  let t = foldMarks(s).toLowerCase().normalize("NFC");
+  t = expandContractions(t);
+  t = t.replace(/[^a-z0-9áéíóúýàèìòùäëïöüçñčďěňřšťžů\s]/g, " ");
+  t = t.replace(/\s+/g, " ").trim();
+  t = t.replace(/\bcan not\b/g, "cannot");
+  return t;
+}
+function sentAnswers(s) {
+  const arr = [s.en];
+  if (Array.isArray(s.alts)) arr.push.apply(arr, s.alts);
+  if (s.alt) arr.push(s.alt);
+  return arr;
+}
+function levenshtein(a, b) {
+  const n = a.length, m = b.length;
+  if (!n) return m; if (!m) return n;
+  let prev = new Array(m + 1), cur = new Array(m + 1);
+  for (let j = 0; j <= m; j++) prev[j] = j;
+  for (let i = 1; i <= n; i++) {
+    cur[0] = i;
+    for (let j = 1; j <= m; j++) {
+      cur[j] = a[i - 1] === b[j - 1] ? prev[j - 1] : 1 + Math.min(prev[j], cur[j - 1], prev[j - 1]);
+    }
+    [prev, cur] = [cur, prev];
+  }
+  return prev[m];
+}
+function tokens(s) { return normSent(s).split(" ").filter(Boolean); }
+function diffWords(typed, expected) {
+  const a = tokens(typed), b = tokens(expected);
+  const n = a.length, m = b.length;
+  const dp = Array.from({ length: n + 1 }, () => new Array(m + 1));
+  for (let i = 0; i <= n; i++) dp[i][0] = i;
+  for (let j = 0; j <= m; j++) dp[0][j] = j;
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  const parts = [];
+  let i = n, j = m;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) { parts.push({ t: "ok", w: b[j - 1] }); i--; j--; }
+    else if (i > 0 && j > 0 && dp[i][j] === dp[i - 1][j - 1] + 1) { parts.push({ t: "bad", w: a[i - 1], e: b[j - 1] }); i--; j--; }
+    else if (j > 0 && (i === 0 || dp[i][j] === dp[i][j - 1] + 1)) { parts.push({ t: "miss", w: b[j - 1] }); j--; }
+    else { parts.push({ t: "extra", w: a[i - 1] }); i--; }
+  }
+  parts.reverse();
+  return { dist: dp[n][m], parts, aLen: n, bLen: m };
+}
+function renderDiff(parts) {
+  return parts.map(p => {
+    if (p.t === "ok") return `<span class="dw ok">${esc(p.w)}</span>`;
+    if (p.t === "bad") return `<span class="dw bad" title="Se esperaba: ${esc(p.e)}">${esc(p.w)}</span>`;
+    if (p.t === "miss") return `<span class="dw miss">${esc(p.w)}</span>`;
+    return `<span class="dw extra">${esc(p.w)}</span>`;
+  }).join(" ");
+}
+function judgeTyped(typed, s) {
+  const answers = sentAnswers(s);
+  const nt = normSent(typed);
+  if (!nt) return { kind: "bad", expected: s.en, typed, parts: [], empty: true };
+  let best = null;
+  for (const ans of answers) {
+    const na = normSent(ans);
+    if (na === nt) return { kind: "ok", expected: ans, typed };
+    const d = diffWords(typed, ans);
+    const lev = levenshtein(nt, na);
+    if (!best || lev < best.lev || (lev === best.lev && d.dist < best.d.dist)) best = { ans, d, lev, na };
+  }
+  const maxLev = Math.max(2, Math.floor(best.na.length * 0.15));
+  const wordAlmost = best.d.dist <= 1 && best.d.bLen >= 2;
+  const kind = (best.lev <= maxLev || wordAlmost) ? "almost" : "bad";
+  return { kind, expected: best.ans, typed, parts: best.d.parts };
+}
+function sortSents(sents) {
+  const today = keyOf(new Date());
+  return sents.map((s, i) => {
+    const r = sentRec(s.id);
+    let p = 3;
+    if (!r) p = 2;
+    else if (r.grade === "again") p = 0;
+    else if (!r.due || r.due <= today) p = 1;
+    else if (r.box >= MASTER_BOX) p = 4;
+    else p = 3;
+    return { s, i, p };
+  }).sort((a, b) => a.p - b.p || a.i - b.i).map(x => x.s);
+}
+function practiceSents(sents) {
+  let list = sortSents(sents);
+  if (ui.sFailedOnly) list = list.filter(s => isSentFailed(s.id));
+  return list;
+}
+function viewSentStats(all) {
+  const st = sentStats(all);
+  return `<p class="small center sent-stats"><span class="ok">Dominadas ${st.mastered}</span> · En curso ${st.learning} · Nuevas ${st.neu}</p>
+  <label class="tog"><input type="checkbox" data-act="failedOnly" ${ui.sFailedOnly ? "checked" : ""}> Repasar falladas</label>`;
+}
+function emptyDeckMsg() {
+  return `<div class="card center"><div style="font-size:40px">${ui.sFailedOnly ? "🎯" : "💬"}</div><h3>${ui.sFailedOnly ? "No tienes oraciones falladas en esta selección" : "No hay oraciones en esta selección"}</h3><p class="small">${ui.sFailedOnly ? "Quita “Repasar falladas” para seguir practicando." : "Prueba otro tema o nivel."}</p></div>`;
+}
+
 
 /* ---------- vistas ---------- */
 const bar = (pct, cls = "") => `<div class="bar ${cls}"><div style="width:${Math.max(0, Math.min(100, pct))}%"></div></div>`;
@@ -196,7 +392,7 @@ function pickers() {
 
 function csStats() {
   const w = CS_ALL_WORDS, s = CS_ALL_SENTS;
-  const kw = w.filter(x => save.known[x.id]).length, ks = s.filter(x => save.sents[x.id]).length;
+  const kw = w.filter(x => save.known[x.id]).length, ks = s.filter(x => isSentMastered(x.id)).length;
   return { kw, tw: w.length, ks, ts: s.length, pct: Math.round((kw + ks) / (w.length + s.length) * 100) };
 }
 
@@ -207,7 +403,7 @@ function viewInicio() {
   const practiced = cal.filter(c => c.xp > 0).length;
   const lvlStats = LEVELS.map(l => {
     const w = ALL_WORDS.filter(x => x.lvl === l), s = ALL_SENTS.filter(x => x.lvl === l);
-    const kw = w.filter(x => save.known[x.id]).length, ks = s.filter(x => save.sents[x.id]).length;
+    const kw = w.filter(x => save.known[x.id]).length, ks = s.filter(x => isSentMastered(x.id)).length;
     return { l, kw, tw: w.length, ks, ts: s.length, pct: Math.round((kw + ks) / (w.length + s.length) * 100) };
   });
   const cs = csStats();
@@ -315,16 +511,81 @@ function viewQuiz() {
 }
 
 function viewStudy(sents) {
-  return `<label class="tog"><input type="checkbox" data-act="tr" ${ui.st.tr ? "checked" : ""}> Mostrar traducción</label>
-  ${sents.map(s => `<div class="card sent"><div class="s-en">${esc(s.en)} ${save.sents[s.id] ? "✅" : ""}</div>${pron(s)}${ui.st.tr ? `<div class="small">${esc(s.es)}</div>` : ""}<div class="small muted">${thLabelOf(s.th)}</div>${spk(s.en, s.id, "s")}</div>`).join("")}`;
+  const deck = practiceSents(sents);
+  const c = ui.st;
+  if (!deck.length) return viewSentStats(sentsAll()) + emptyDeckMsg();
+  const s = deck[c.idx % deck.length];
+  let body;
+  if (!c.reveal) {
+    body = `<div class="card center sent-prompt">
+      <p class="small">¿Cómo se dice en ${langName()}?</p>
+      <div class="s-es">${esc(s.es)}</div>
+      <p class="small muted">Piénsala y luego revela la respuesta</p>
+    </div>
+    <button class="big blue" data-act="sreveal">Ver respuesta</button>`;
+  } else {
+    body = `<div class="card center sent-prompt">
+      <p class="small">¿Cómo se dice en ${langName()}?</p>
+      <div class="s-es">${esc(s.es)}</div>
+      <div class="s-en">${esc(s.en)}</div>
+      ${pron(s)}${spk(s.en, s.id, "s")}
+    </div>`;
+    if (!c.rated) {
+      body += `<div class="rate-btns">
+        <button class="big red" data-act="srate" data-v="again">No la sabía</button>
+        <button class="big gold" data-act="srate" data-v="hard">Más o menos</button>
+        <button class="big green" data-act="srate" data-v="good">La sabía</button>
+      </div>`;
+    } else {
+      const msg = c.rated === "good" ? "La sabías ✓" : c.rated === "hard" ? "Más o menos · la repasaremos" : "A repasar";
+      const cls = c.rated === "good" ? "good" : c.rated === "hard" ? "mid" : "bad";
+      body += `<div class="feedback ${cls}"><b>${msg}</b><button class="big green" data-act="snext">Siguiente</button></div>`;
+    }
+  }
+  return `${viewSentStats(sentsAll())}
+  <p class="small">Frase ${c.idx % deck.length + 1} de ${deck.length} · ${thLabelOf(s.th)}</p>
+  ${body}`;
 }
+function viewWrite(sents) {
+  const deck = practiceSents(sents);
+  const w = ui.wr;
+  if (!deck.length) return viewSentStats(sentsAll()) + emptyDeckMsg();
+  const s = deck[w.idx % deck.length];
+  const ph = isCs() ? "Escribe la oración en checo…" : "Escribe la oración en inglés…";
+  let body = `<div class="card center sent-prompt">
+    <p class="small">Escribe esta oración en ${langName()}</p>
+    <div class="s-es">${esc(s.es)}</div>
+  </div>`;
+  if (!w.res) {
+    body += `<label class="sel sent-lab" for="sent-input">Tu respuesta
+      <textarea id="sent-input" class="sent-input" rows="3" lang="${isCs() ? "cs" : "en"}" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="${esc(ph)}"></textarea>
+    </label>
+    <button class="big green" data-act="wcheck">Comprobar</button>`;
+  } else {
+    const r = w.res;
+    const title = r.empty ? "Escribe la oración para comprobarla" : r.kind === "ok" ? "¡Correcto!" : r.kind === "almost" ? "Casi correcto" : "Incorrecto";
+    const cls = r.kind === "ok" ? "good" : r.kind === "almost" ? "mid" : "bad";
+    const diff = r.parts && r.parts.length ? `<div class="diff-line">${renderDiff(r.parts)}</div><p class="small">En verde lo correcto, en rojo lo que falló y subrayado lo que faltaba.</p>` : "";
+    body += `<div class="feedback ${cls}">
+      <b>${title}</b>
+      ${r.kind !== "ok" && !r.empty ? `<div class="your-ans small">Escribiste: ${esc(r.typed)}</div>${diff}` : ""}
+      ${r.empty ? `<button class="big gray" data-act="wretry">Volver a escribir</button>` : `<div class="s-en">${esc(r.expected)}</div>${pron(s)}${spk(s.en, s.id, "s")}<button class="big ${r.kind === "bad" ? "red" : "green"}" data-act="wnext">Siguiente</button>`}
+    </div>`;
+  }
+  return `${viewSentStats(sentsAll())}
+  <p class="small">Frase ${w.idx % deck.length + 1} de ${deck.length} · ${thLabelOf(s.th)}</p>
+  ${body}`;
+}
+
 function chooseOpts(s, bank) {
   const wrong = shuffle(bank.filter(b => b.id !== s.id), hash(s.id)).slice(0, 2).map(b => b.en);
   return shuffle([s.en, ...wrong], hash(s.id) + 3);
 }
 function viewChoose(sents, bank) {
-  const c = ui.ch, s = sents[c.idx % sents.length], options = chooseOpts(s, bank), ans = options.indexOf(s.en);
-  return `<p class="small">Frase ${c.idx % sents.length + 1} de ${sents.length} · ${thLabelOf(s.th)}</p>
+  const deck = practiceSents(sents);
+  if (!deck.length) return viewSentStats(sentsAll()) + emptyDeckMsg();
+  const c = ui.ch, s = deck[c.idx % deck.length], options = chooseOpts(s, bank), ans = options.indexOf(s.en);
+  return `${viewSentStats(sentsAll())}<p class="small">Frase ${c.idx % deck.length + 1} de ${deck.length} · ${thLabelOf(s.th)}</p>
   <div class="card center"><p class="small">¿Cómo se dice en ${langName()}?</p><div class="s-es">${esc(s.es)}</div></div>
   <div class="opts">${options.map((o, i) => { const st = c.picked === null ? "" : i === ans ? "right" : i === c.picked ? "wrong" : "dim";
     return `<button class="opt ${st}" data-act="cpick" data-v="${i}" data-ans="${ans}" data-id="${s.id}" ${c.picked !== null ? "disabled" : ""}>${esc(o)}</button>`; }).join("")}</div>
@@ -336,8 +597,10 @@ function orderWords(s) {
   return order.map(i => w[i]);
 }
 function viewOrder(sents) {
-  const o = ui.ord, s = sents[o.idx % sents.length], words = orderWords(s);
-  return `<p class="small">Frase ${o.idx % sents.length + 1} de ${sents.length} · ${thLabelOf(s.th)}</p>
+  const deck = practiceSents(sents);
+  if (!deck.length) return viewSentStats(sentsAll()) + emptyDeckMsg();
+  const o = ui.ord, s = deck[o.idx % deck.length], words = orderWords(s);
+  return `${viewSentStats(sentsAll())}<p class="small">Frase ${o.idx % deck.length + 1} de ${deck.length} · ${thLabelOf(s.th)}</p>
   <div class="card center"><p class="small">Ordena las palabras para traducir:</p><div class="s-es">${esc(s.es)}</div></div>
   <div class="answer ${o.res || ""}">${o.pick.length ? o.pick.map((i, j) => `<button class="chip" data-act="unpick" data-v="${j}" ${o.res ? "disabled" : ""}>${esc(words[i])}</button>`).join("") : `<span class="small muted">Toca las palabras en orden…</span>`}</div>
   <div class="bank">${words.map((w, i) => `<button class="chip ${o.pick.includes(i) ? "used" : ""}" data-act="opick" data-v="${i}" ${o.pick.includes(i) || o.res ? "disabled" : ""}>${esc(w)}</button>`).join("")}</div>
@@ -360,12 +623,13 @@ function render() {
     h = `<h2 class="title">Vocabulario</h2>${pickers()}${seg("vMode", [["tarjetas", "Tarjetas"], ["quiz", "Quiz"]], ui.vMode)}`;
     h += ui.vMode === "tarjetas" ? viewFlash(curWords()) : viewQuiz();
   } else {
-    h = `<h2 class="title">Oraciones útiles</h2>${pickers()}${seg("sMode", [["estudiar", "Estudiar"], ["elegir", "Elegir"], ["ordenar", "Ordenar"]], ui.sMode)}`;
+    h = `<h2 class="title">Oraciones útiles</h2>${pickers()}${seg("sMode", [["estudiar", "Estudiar"], ["escribir", "Escribir"], ["elegir", "Elegir"], ["ordenar", "Ordenar"]], ui.sMode)}`;
     const ss = curSents();
-    h += ui.sMode === "estudiar" ? viewStudy(ss) : ui.sMode === "elegir" ? viewChoose(ss, sentsAll()) : viewOrder(ss);
-    h += `<p class="small center">Frases dominadas${isCs() ? " en checo" : ` en ${save.lvl}`}: ${sentsAll().filter(s => save.sents[s.id]).length}/${sentsAll().length}</p>`;
+    h += ui.sMode === "estudiar" ? viewStudy(ss) : ui.sMode === "escribir" ? viewWrite(ss) : ui.sMode === "elegir" ? viewChoose(ss, sentsAll()) : viewOrder(ss);
   }
   document.getElementById("main").innerHTML = h;
+  const input = document.getElementById("sent-input");
+  if (input) input.focus({ preventScroll: true });
 }
 
 /* ---------- eventos ---------- */
@@ -398,42 +662,75 @@ document.addEventListener("click", e => {
   switch (a) {
     case "tab": ui.tab = v; window.scrollTo(0, 0); break;
     case "lang": setLang(v); window.scrollTo(0, 0); break;
-    case "seg": if (b.dataset.k === "lvl") { save.lvl = v; persist(); resetSub(); } else { ui[b.dataset.k] = v; resetSub(); } break;
-    case "setlvl": save.lvl = v; save.lang = "en"; persist(); ui.th = "todos"; resetSub(); break;
+    case "seg": if (b.dataset.k === "lvl") { save.lvl = v; persist(); ui.sFailedOnly = false; resetSub(); } else { ui[b.dataset.k] = v; resetSub(); } break;
+    case "setlvl": save.lvl = v; save.lang = "en"; persist(); ui.th = "todos"; ui.sFailedOnly = false; resetSub(); break;
     case "flip": ui.fc.flipped = !ui.fc.flipped; break;
     case "mark": { const words = curWords(); const deck = ui.fc.pending ? words.filter(w => !save.known[w.id]) : words; const w = deck[ui.fc.idx % deck.length]; if (!w) break;
       const k = v === "1"; markWord(w.id, k); ui.fc.flipped = false; ui.fc.idx = ui.fc.pending && k ? ui.fc.idx : ui.fc.idx + 1; break; }
     case "quizstart": startQuiz(curWords(), wordsAll()); break;
     case "qpick": { const z = ui.quiz; if (z.picked !== null) break; z.picked = +v; if (+v === z.qs[z.qi].ans) { z.score++; gain(10); } break; }
     case "qnext": { const z = ui.quiz; if (z.qi + 1 >= z.qs.length) { z.done = true; if (z.score >= Math.ceil(z.qs.length * 0.75)) gain(10); } else { z.qi++; z.picked = null; } break; }
-    case "cpick": if (ui.ch.picked !== null) break; ui.ch.picked = +v; if (+v === +b.dataset.ans) sentOk(b.dataset.id, 10); break;
+    case "cpick": if (ui.ch.picked !== null) break; ui.ch.picked = +v; if (+v === +b.dataset.ans) sentOk(b.dataset.id, 10); else gradeSent(b.dataset.id, "again"); break;
     case "cnext": ui.ch.idx++; ui.ch.picked = null; break;
     case "opick": ui.ord.pick.push(+v); break;
     case "unpick": ui.ord.pick.splice(+v, 1); break;
     case "oclear": ui.ord.pick = []; break;
-    case "ocheck": { const ss = curSents(); const s = ss[ui.ord.idx % ss.length]; const w = orderWords(s);
-      const ok = ui.ord.pick.map(i => w[i]).join(" ") === s.en; ui.ord.res = ok ? "ok" : "bad"; if (ok) sentOk(s.id, 15); break; }
+    case "ocheck": { const ss = practiceSents(curSents()); const s = ss[ui.ord.idx % ss.length]; if (!s) break; const w = orderWords(s);
+      const ok = ui.ord.pick.map(i => w[i]).join(" ") === s.en; ui.ord.res = ok ? "ok" : "bad"; if (ok) sentOk(s.id, 15); else gradeSent(s.id, "again"); break; }
     case "onext": ui.ord = { idx: ui.ord.idx + 1, pick: [], res: null }; break;
+    case "sreveal": ui.st.reveal = true; break;
+    case "srate": { const ss = practiceSents(curSents()); const s = ss[ui.st.idx % ss.length]; if (!s || ui.st.rated) break;
+      gradeSent(s.id, v, 10); ui.st.rated = v; break; }
+    case "snext": ui.st = { idx: ui.st.idx + 1, reveal: false, rated: false }; break;
+    case "wcheck": {
+      const ss = practiceSents(curSents()); const s = ss[ui.wr.idx % ss.length]; if (!s || ui.wr.res) break;
+      const typed = (document.getElementById("sent-input") || {}).value || "";
+      const res = judgeTyped(typed, s);
+      ui.wr.res = res;
+      if (res.empty) break;
+      if (res.kind === "ok") gradeSent(s.id, "good", 15);
+      else if (res.kind === "almost") gradeSent(s.id, "hard", 5);
+      else gradeSent(s.id, "again");
+      ui._speak = { t: s.en, id: s.id, kind: "s" };
+      break;
+    }
+    case "wretry": ui.wr.res = null; break;
+    case "wnext": ui.wr = { idx: ui.wr.idx + 1, res: null }; break;
     case "export": exportProgress(); return;
     case "import": document.getElementById("imp").click(); return;
     case "reset": if (confirm("¿Seguro? Se borrará todo tu XP, rachas y palabras aprendidas.")) { save = Object.assign({}, BLANK, { goal: save.goal, lvl: save.lvl, lang: save.lang }); persist(); } break;
     default: return;
   }
   render();
+  if (ui._speak) { const sp = ui._speak; ui._speak = null; speak(sp.t, sp.id, sp.kind); }
 });
-document.addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.act === "flip") { e.preventDefault(); ui.fc.flipped = !ui.fc.flipped; render(); } });
+document.addEventListener("keydown", e => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.dataset && e.target.dataset.act === "flip") { e.preventDefault(); ui.fc.flipped = !ui.fc.flipped; render(); }
+  if (e.key === "Enter" && !e.shiftKey && e.target && e.target.id === "sent-input") {
+    e.preventDefault();
+    const btn = document.querySelector('[data-act="wcheck"]');
+    if (btn) btn.click();
+  }
+});
 document.addEventListener("change", e => {
   const t = e.target, a = t.dataset.act;
   if (a === "theme") { ui.th = t.value; resetSub(); }
   else if (a === "goal") { save.goal = Number(t.value); persist(); }
   else if (a === "pending") { ui.fc = { idx: 0, flipped: false, pending: t.checked }; }
-  else if (a === "tr") { ui.st.tr = t.checked; }
+  else if (a === "failedOnly") { ui.sFailedOnly = t.checked; ui.st = { idx: 0, reveal: false, rated: false }; ui.wr = { idx: 0, res: null }; ui.ch = { idx: 0, picked: null }; ui.ord = { idx: 0, pick: [], res: null }; }
   else if (t.id === "imp") { if (t.files[0]) importProgress(t.files[0]); return; }
   else return;
   render();
 });
 // Al volver a la app (p. ej. al día siguiente), refresca racha y calendario
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { save = load(); render(); } });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  const typed = (document.getElementById("sent-input") || {}).value;
+  save = load();
+  render();
+  const input = document.getElementById("sent-input");
+  if (input && typed) input.value = typed;
+});
 if ("speechSynthesis" in window) speechSynthesis.getVoices();
 
 render();
