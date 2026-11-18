@@ -1,4 +1,4 @@
-const CACHE = "ingles-trabajo-v7";
+const CACHE = "ingles-trabajo-v8";
 const AUDIO_CACHE = "ingles-trabajo-audio-v5";
 const ASSETS = ["./", "./index.html", "./styles.css", "./data.js", "./app.js", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png", "./icons/icon-maskable-512.png"];
@@ -88,7 +88,18 @@ self.addEventListener("fetch", e => {
     })());
     return;
   }
-  // red primero (para recibir actualizaciones), caché si no hay internet
-  e.respondWith(fetch(e.request).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); return r; })
-    .catch(() => caches.match(e.request, { ignoreSearch: true }).then(r => r || caches.match("./index.html"))));
+  // red primero, sin usar la caché HTTP (GitHub Pages guarda 10 min).
+  // Así el iPad no se queda con un app.js viejo. Si no hay internet, usamos la caché local.
+  e.respondWith((async () => {
+    try {
+      const res = await fetch(e.request, { cache: "no-store" });
+      if (res && res.ok) {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy));
+      }
+      return res;
+    } catch (err) {
+      return (await caches.match(e.request, { ignoreSearch: true })) || (await caches.match("./index.html"));
+    }
+  })());
 });

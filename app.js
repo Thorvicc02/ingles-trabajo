@@ -3,6 +3,7 @@
    Módulo de checo de supervivencia (A0–A1). El campo `en` es el texto
    del idioma que se estudia (inglés o checo). */
 const KEY = "ingles-trabajo-v1";
+const APP_VERSION = "v8";
 const BLANK = { xp: 0, days: {}, known: {}, sents: {}, goal: 50, lvl: "B1", lang: "en" };
 
 function store() { try { return window.localStorage || null; } catch (e) { return null; } }
@@ -140,14 +141,36 @@ const ui = { tab: "inicio", th: "todos", vMode: "tarjetas", sMode: "estudiar",
   wr: { idx: 0, res: null, id: null },
   ch: { idx: 0, picked: null, id: null },
   ord: { idx: 0, pick: [], res: null, id: null },
-  sFailedOnly: false };
+  pr: { idx: 0, id: null, status: "idle", showTarget: false, transcript: "", kind: null, pct: 0, parts: null, graded: false, rated: false },
+  sFailedOnly: false,
+  sGen: 0 };
+function blankPr(showTarget) {
+  return { idx: 0, id: null, status: "idle", showTarget: !!showTarget, transcript: "", kind: null, pct: 0, parts: null, graded: false, rated: false };
+}
+function blankPractice() {
+  return {
+    st: { idx: 0, reveal: false, rated: false, id: null },
+    wr: { idx: 0, res: null, id: null },
+    ch: { idx: 0, picked: null, id: null },
+    ord: { idx: 0, pick: [], res: null, id: null },
+    pr: blankPr(false)
+  };
+}
+let recInst = null, recGen = 0;
+function stopRec() {
+  recGen++;
+  if (!recInst) return;
+  const inst = recInst;
+  recInst = null;
+  try { inst.abort(); } catch (e) {}
+}
+function speechCtor() { return window.SpeechRecognition || window.webkitSpeechRecognition || null; }
 function resetSub() {
+  stopRec();
   ui.fc = { idx: 0, flipped: false, pending: ui.fc.pending };
   ui.quiz = null;
-  ui.st = { idx: 0, reveal: false, rated: false, id: null };
-  ui.wr = { idx: 0, res: null, id: null };
-  ui.ch = { idx: 0, picked: null, id: null };
-  ui.ord = { idx: 0, pick: [], res: null, id: null };
+  ui.sGen = (ui.sGen || 0) + 1;
+  Object.assign(ui, blankPractice());
 }
 
 function isCs() { return save.lang === "cs"; }
@@ -637,6 +660,154 @@ function viewOrder(sents) {
     : `<div class="row2"><button class="big gray" data-act="oclear">Borrar</button><button class="big green" data-act="ocheck" data-id="${s.id}" ${o.pick.length !== words.length ? "disabled" : ""}>Comprobar</button></div>`}`;
 }
 
+function scoreTranscript(typed, s) {
+  const judged = judgeTyped(typed, s);
+  if (!typed || !String(typed).trim() || judged.empty) return Object.assign({}, judged, { pct: 0, parts: judged.parts || [] });
+  const d = judged.parts && judged.parts.length ? { parts: judged.parts, bLen: judged.parts.filter(p => p.t !== "extra").length } : diffWords(typed, judged.expected || s.en);
+  const ok = (d.parts || []).filter(p => p.t === "ok").length;
+  const total = Math.max(d.bLen || tokens(judged.expected || s.en).length, 1);
+  let pct = Math.round(ok / total * 100);
+  if (judged.kind === "ok") pct = 100;
+  return Object.assign({}, judged, { pct, parts: d.parts || [] });
+}
+function gradePron(s, scored) {
+  if (!s || !ui.pr || ui.pr.graded) return;
+  ui.pr.graded = true;
+  if (scored.kind === "ok" || scored.pct >= 90) gradeSent(s.id, "good", 15);
+  else if (scored.kind === "almost" || scored.pct >= 60) gradeSent(s.id, "hard", 5);
+  else gradeSent(s.id, "again");
+}
+function applyPronResult(s, text) {
+  const scored = scoreTranscript(text, s);
+  if (!String(text || "").trim()) {
+    ui.pr.status = "nospeech";
+    ui.pr.transcript = "";
+    return;
+  }
+  ui.pr.status = "result";
+  ui.pr.transcript = text;
+  ui.pr.kind = scored.kind;
+  ui.pr.pct = scored.pct;
+  ui.pr.parts = scored.parts;
+  gradePron(s, scored);
+}
+function startRec(s) {
+  const Ctor = speechCtor();
+  if (!Ctor) return "unsupported";
+  stopRec();
+  const gen = recGen, modeGen = ui.sGen;
+  try {
+    const inst = new Ctor();
+    recInst = inst;
+    inst.lang = isCs() ? "cs-CZ" : "en-US";
+    inst.interimResults = false;
+    inst.maxAlternatives = 3;
+    inst.continuous = false;
+    inst.onresult = ev => {
+      if (gen !== recGen || ui.sMode !== "pronunciar" || ui.sGen !== modeGen) return;
+      let best = "", bestPct = -1;
+      const alt = ev.results && ev.results[0];
+      const n = alt ? alt.length : 0;
+      for (let i = 0; i < n; i++) {
+        const t = (alt[i] && alt[i].transcript) || "";
+        const sc = scoreTranscript(t, s);
+        if (sc.pct > bestPct) { bestPct = sc.pct; best = t; }
+      }
+      applyPronResult(s, best);
+      recInst = null;
+      render();
+    };
+    inst.onerror = ev => {
+      if (gen !== recGen || ui.sMode !== "pronunciar" || ui.sGen !== modeGen) return;
+      const err = (ev && ev.error) || "";
+      if (err === "aborted") return;
+      if (err === "not-allowed" || err === "service-not-allowed") ui.pr.status = "denied";
+      else if (err === "no-speech") ui.pr.status = "nospeech";
+      else ui.pr.status = "error";
+      recInst = null;
+      render();
+    };
+    inst.onend = () => {
+      if (gen !== recGen || ui.sMode !== "pronunciar" || ui.sGen !== modeGen) return;
+      if (ui.pr.status === "listening") {
+        ui.pr.status = "nospeech";
+        recInst = null;
+        render();
+      }
+    };
+    inst.start(); // debe ir en el mismo toque del usuario (requisito de iOS)
+    return "ok";
+  } catch (err) {
+    recInst = null;
+    const msg = String((err && err.message) || err || "");
+    return /not allowed|permission|denied/i.test(msg) ? "denied" : "unsupported";
+  }
+}
+function viewPronounce(sents) {
+  const { s, num, total } = currentPractice(sents, ui.pr);
+  if (!s) return viewSentStats(sentsAll()) + emptyDeckMsg();
+  const p = ui.pr, supported = !!speechCtor();
+  const fallback = !supported || p.status === "unsupported" || p.status === "denied";
+  let body = `<div class="card center sent-prompt">
+    <p class="small">Escucha y pronuncia esta oración en ${langName()}</p>
+    <div class="s-es">${esc(s.es)}</div>
+    ${p.showTarget ? `<div class="s-en">${esc(s.en)}</div>${pron(s)}` : ""}
+    ${spk(s.en, s.id, "s")}
+  </div>
+  <label class="tog"><input type="checkbox" data-act="prshow" ${p.showTarget ? "checked" : ""}> Mostrar también la oración en ${langName()}</label>`;
+  if (p.status === "listening") {
+    body += `<button class="big red mic listening" data-act="prstop" aria-live="polite">🎤 Escuchando… habla ahora</button>
+      <button class="big gray" data-act="prstop">Cancelar</button>`;
+  } else if (p.status === "result") {
+    const cls = p.kind === "ok" ? "good" : p.kind === "almost" ? "mid" : "bad";
+    const title = p.kind === "ok" ? "¡Muy bien!" : p.kind === "almost" ? "Casi" : "A practicar";
+    body += `<div class="feedback ${cls}">
+      <div class="pct">${p.pct}%</div>
+      <b>${title}</b>
+      <p class="small">Dijiste: ${esc(p.transcript)}</p>
+      ${p.parts && p.parts.length ? `<div class="diff-line">${renderDiff(p.parts)}</div><p class="small">En verde lo que se reconoció, subrayado lo que faltó y en rojo lo distinto.</p>` : ""}
+      <div class="s-en">${esc(s.en)}</div>
+      ${pron(s)}${spk(s.en, s.id, "s")}
+      <div class="rate-btns">
+        <button class="big blue" data-act="prretry">Reintentar</button>
+        <button class="big green" data-act="prnext">Siguiente</button>
+      </div>
+    </div>`;
+  } else if (p.status === "nospeech") {
+    body += `<div class="feedback mid"><b>No se detectó ninguna voz</b><p class="small">Acércate al micrófono y prueba de nuevo.</p>
+      <button class="big blue" data-act="prretry">Reintentar</button></div>`;
+  } else if (fallback) {
+    const msg = p.status === "denied"
+      ? "No hay permiso para el micrófono. En Ajustes de Safari (o de esta app) puedes activarlo. Mientras tanto, escucha, repite en voz alta y califícate."
+      : "Este iPad o navegador no puede reconocer la voz aquí. Escucha la oración, repítela en voz alta y califícate.";
+    body += `<div class="feedback mid"><b>No se puede usar el micrófono</b><p class="small">${msg}</p></div>`;
+    if (!p.rated) {
+      body += `<div class="rate-btns">
+        <button class="big red" data-act="prrate" data-v="again">No la sabía</button>
+        <button class="big gold" data-act="prrate" data-v="hard">Más o menos</button>
+        <button class="big green" data-act="prrate" data-v="good">La sabía</button>
+      </div>`;
+    } else {
+      const msgR = p.rated === "good" ? "La sabías ✓" : p.rated === "hard" ? "Más o menos · la repasaremos" : "A repasar";
+      const cls = p.rated === "good" ? "good" : p.rated === "hard" ? "mid" : "bad";
+      body += `<div class="feedback ${cls}"><b>${msgR}</b><button class="big green" data-act="prnext">Siguiente</button></div>`;
+    }
+  } else if (p.status === "error") {
+    body += `<div class="feedback mid"><b>No se pudo reconocer la voz</b><p class="small">Prueba de nuevo, o escucha, repite y califícate a mano.</p>
+      <div class="rate-btns">
+        <button class="big blue" data-act="prretry">Reintentar</button>
+        <button class="big red" data-act="prrate" data-v="again">No la sabía</button>
+        <button class="big gold" data-act="prrate" data-v="hard">Más o menos</button>
+        <button class="big green" data-act="prrate" data-v="good">La sabía</button>
+      </div></div>`;
+  } else {
+    body += `<button class="big green mic" data-act="prmic">🎤 Hablar</button>`;
+  }
+  return `${viewSentStats(sentsAll())}
+  <p class="small">Frase ${num} de ${total} · ${thLabelOf(s.th)}</p>
+  ${body}`;
+}
+
 function render() {
   const now = new Date(), todayXp = save.days[keyOf(now)] || 0, st = streaks(save.days, now);
   document.getElementById("hdr-streak").textContent = `🔥 ${st.cur}`;
@@ -652,11 +823,25 @@ function render() {
     h = `<h2 class="title">Vocabulario</h2>${pickers()}${seg("vMode", [["tarjetas", "Tarjetas"], ["quiz", "Quiz"]], ui.vMode)}`;
     h += ui.vMode === "tarjetas" ? viewFlash(curWords()) : viewQuiz();
   } else {
-    h = `<h2 class="title">Oraciones útiles</h2>${pickers()}${seg("sMode", [["estudiar", "Estudiar"], ["escribir", "Escribir"], ["elegir", "Elegir"], ["ordenar", "Ordenar"]], ui.sMode)}`;
+    h = `<h2 class="title">Oraciones útiles</h2>${pickers()}${seg("sMode", [["estudiar", "Estudiar"], ["escribir", "Escribir"], ["elegir", "Elegir"], ["ordenar", "Ordenar"], ["pronunciar", "Pronunciar"]], ui.sMode)}`;
     const ss = curSents();
-    h += ui.sMode === "estudiar" ? viewStudy(ss) : ui.sMode === "escribir" ? viewWrite(ss) : ui.sMode === "elegir" ? viewChoose(ss, sentsAll()) : viewOrder(ss);
+    h += ui.sMode === "estudiar" ? viewStudy(ss) : ui.sMode === "escribir" ? viewWrite(ss) : ui.sMode === "elegir" ? viewChoose(ss, sentsAll()) : ui.sMode === "ordenar" ? viewOrder(ss) : viewPronounce(ss);
   }
-  document.getElementById("main").innerHTML = h;
+  let main = document.getElementById("main");
+  // Reemplaza el nodo para no dejar listeners residuales al cambiar de modo.
+  const fresh = document.createElement("main");
+  fresh.id = "main";
+  fresh.innerHTML = h;
+  main.replaceWith(fresh);
+  main = fresh;
+  const ver = document.getElementById("hdr-ver") || (function() {
+    const el = document.createElement("span");
+    el.id = "hdr-ver"; el.className = "ver";
+    const brand = document.querySelector(".brand");
+    if (brand) brand.appendChild(el);
+    return el;
+  })();
+  if (ver) ver.textContent = APP_VERSION;
   const input = document.getElementById("sent-input");
   if (input) input.focus({ preventScroll: true });
 }
@@ -684,10 +869,14 @@ function importProgress(file) {
   r.readAsText(file);
 }
 
+let clickLockUntil = 0;
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b || b.tagName === "SELECT" || b.tagName === "INPUT") return;
+  // En iPad, al reemplazar el DOM un clic sintético tardío puede caer en el botón nuevo.
+  if (e.isTrusted && performance.now() < clickLockUntil) return;
+  if (!b.isConnected) return;
   const a = b.dataset.act, v = b.dataset.v;
-  if (a === "speak") { e.stopPropagation(); speak(b.dataset.t, b.dataset.id, b.dataset.kind); return; }
+  if (a === "speak") { e.stopPropagation(); stopRec(); if (ui.sMode === "pronunciar" && ui.pr.status === "listening") ui.pr.status = "idle"; speak(b.dataset.t, b.dataset.id, b.dataset.kind); return; }
   switch (a) {
     case "tab": ui.tab = v; window.scrollTo(0, 0); break;
     case "lang": setLang(v); window.scrollTo(0, 0); break;
@@ -700,7 +889,7 @@ document.addEventListener("click", e => {
     case "qpick": { const z = ui.quiz; if (z.picked !== null) break; z.picked = +v; if (+v === z.qs[z.qi].ans) { z.score++; gain(10); } break; }
     case "qnext": { const z = ui.quiz; if (z.qi + 1 >= z.qs.length) { z.done = true; if (z.score >= Math.ceil(z.qs.length * 0.75)) gain(10); } else { z.qi++; z.picked = null; } break; }
     case "cpick": {
-      if (ui.ch.picked !== null) break;
+      if (ui.sMode !== "elegir" || ui.ch.picked !== null) break;
       const s = sentById(ui.ch.id, curSents()) || sentById(b.dataset.id, curSents());
       if (!s || (b.dataset.id && b.dataset.id !== s.id)) break;
       ui.ch.picked = +v;
@@ -708,12 +897,12 @@ document.addEventListener("click", e => {
       ui._speak = { t: s.en, id: s.id, kind: "s" };
       break;
     }
-    case "cnext": if (ui.ch.picked === null) break; advancePractice(ui.ch, { picked: null }); break;
-    case "opick": if (ui.ord.res) break; ui.ord.pick.push(+v); break;
-    case "unpick": if (ui.ord.res) break; ui.ord.pick.splice(+v, 1); break;
-    case "oclear": if (ui.ord.res) break; ui.ord.pick = []; break;
+    case "cnext": if (ui.sMode !== "elegir" || ui.ch.picked === null) break; advancePractice(ui.ch, { picked: null }); break;
+    case "opick": if (ui.sMode !== "ordenar" || ui.ord.res) break; ui.ord.pick.push(+v); break;
+    case "unpick": if (ui.sMode !== "ordenar" || ui.ord.res) break; ui.ord.pick.splice(+v, 1); break;
+    case "oclear": if (ui.sMode !== "ordenar" || ui.ord.res) break; ui.ord.pick = []; break;
     case "ocheck": {
-      if (ui.ord.res) break;
+      if (ui.sMode !== "ordenar" || ui.ord.res) break;
       const s = sentById(ui.ord.id, curSents()); if (!s) break;
       const w = orderWords(s);
       const ok = ui.ord.pick.map(i => w[i]).join(" ") === s.en; ui.ord.res = ok ? "ok" : "bad";
@@ -721,15 +910,16 @@ document.addEventListener("click", e => {
       ui._speak = { t: s.en, id: s.id, kind: "s" };
       break;
     }
-    case "onext": if (!ui.ord.res) break; advancePractice(ui.ord, { pick: [], res: null }); break;
-    case "sreveal": ui.st.reveal = true; break;
+    case "onext": if (ui.sMode !== "ordenar" || !ui.ord.res) break; advancePractice(ui.ord, { pick: [], res: null }); break;
+    case "sreveal": if (ui.sMode !== "estudiar") break; ui.st.reveal = true; break;
     case "srate": {
+      if (ui.sMode !== "estudiar") break;
       const s = sentById(ui.st.id, curSents()); if (!s || ui.st.rated) break;
       gradeSent(s.id, v, 10); ui.st.rated = v; break;
     }
-    case "snext": if (!ui.st.rated) break; advancePractice(ui.st, { reveal: false, rated: false }); break;
+    case "snext": if (ui.sMode !== "estudiar" || !ui.st.rated) break; advancePractice(ui.st, { reveal: false, rated: false }); break;
     case "wcheck": {
-      if (ui.wr.res) break;
+      if (ui.sMode !== "escribir" || ui.wr.res) break;
       const s = sentById(ui.wr.id, curSents()); if (!s) break;
       const typed = (document.getElementById("sent-input") || {}).value || "";
       const res = judgeTyped(typed, s);
@@ -741,14 +931,40 @@ document.addEventListener("click", e => {
       ui._speak = { t: s.en, id: s.id, kind: "s" };
       break;
     }
-    case "wretry": ui.wr.res = null; break;
-    case "wnext": if (!ui.wr.res || ui.wr.res.empty) break; advancePractice(ui.wr, { res: null }); break;
+    case "wretry": if (ui.sMode !== "escribir") break; ui.wr.res = null; break;
+    case "wnext": if (ui.sMode !== "escribir" || !ui.wr.res || ui.wr.res.empty) break; advancePractice(ui.wr, { res: null }); break;
+    case "prmic": {
+      if (ui.sMode !== "pronunciar") break;
+      const s = sentById(ui.pr.id, curSents()); if (!s) break;
+      try { if ("speechSynthesis" in window) speechSynthesis.cancel(); } catch (err) {}
+      const started = startRec(s);
+      if (started === "ok") ui.pr.status = "listening";
+      else { ui.pr.status = started; }
+      break;
+    }
+    case "prstop": if (ui.sMode !== "pronunciar") break; stopRec(); ui.pr.status = "idle"; break;
+    case "prretry": if (ui.sMode !== "pronunciar") break; stopRec(); ui.pr.status = "idle"; ui.pr.transcript = ""; ui.pr.parts = null; break;
+    case "prrate": {
+      if (ui.sMode !== "pronunciar" || ui.pr.rated) break;
+      const s = sentById(ui.pr.id, curSents()); if (!s) break;
+      gradeSent(s.id, v, 10); ui.pr.rated = v; ui.pr.graded = true; break;
+    }
+    case "prnext": {
+      if (ui.sMode !== "pronunciar") break;
+      if (ui.pr.status !== "result" && !ui.pr.rated) break;
+      const show = ui.pr.showTarget;
+      stopRec();
+      advancePractice(ui.pr, blankPr(show));
+      break;
+    }
     case "export": exportProgress(); return;
     case "import": document.getElementById("imp").click(); return;
     case "reset": if (confirm("¿Seguro? Se borrará todo tu XP, rachas y palabras aprendidas.")) { save = Object.assign({}, BLANK, { goal: save.goal, lvl: save.lvl, lang: save.lang }); persist(); } break;
     default: return;
   }
   render();
+  // Bloquea el clic fantasma de Safari (~300 ms) después de un render.
+  clickLockUntil = performance.now() + 450;
   if (ui._speak) { const sp = ui._speak; ui._speak = null; speak(sp.t, sp.id, sp.kind); }
 });
 document.addEventListener("keydown", e => {
@@ -765,13 +981,21 @@ document.addEventListener("change", e => {
   else if (a === "goal") { save.goal = Number(t.value); persist(); }
   else if (a === "pending") { ui.fc = { idx: 0, flipped: false, pending: t.checked }; }
   else if (a === "failedOnly") { ui.sFailedOnly = t.checked; resetSub(); }
+  else if (a === "prshow") { if (ui.pr) ui.pr.showTarget = t.checked; }
   else if (t.id === "imp") { if (t.files[0]) importProgress(t.files[0]); return; }
   else return;
   render();
 });
 // Al volver a la app (p. ej. al día siguiente), refresca racha y calendario
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) return;
+  if (document.hidden) {
+    stopRec();
+    if (ui.pr && ui.pr.status === "listening") ui.pr.status = "idle";
+    return;
+  }
+  if (navigator.serviceWorker) {
+    navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => {});
+  }
   const typed = (document.getElementById("sent-input") || {}).value;
   save = load();
   render();
@@ -780,7 +1004,35 @@ document.addEventListener("visibilitychange", () => {
 });
 if ("speechSynthesis" in window) speechSynthesis.getVoices();
 
+function ensureVersionLabel() {
+  let el = document.getElementById("hdr-ver");
+  if (!el) {
+    el = document.createElement("span");
+    el.id = "hdr-ver";
+    el.className = "ver";
+    const brand = document.querySelector(".brand");
+    if (brand) brand.appendChild(el);
+  }
+  el.textContent = APP_VERSION;
+}
+
 render();
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
-  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+  // Recarga solo cuando ya había un SW y entra uno nuevo (actualización).
+  // El primer claim no recarga: evitaria un parpadeo y un bucle al abrir la app.
+  if (navigator.serviceWorker.controller) {
+    let reloading = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (reloading) return;
+      reloading = true;
+      location.reload();
+    });
+  }
+  const bootSW = () => {
+    navigator.serviceWorker.register("./sw.js?v=" + APP_VERSION, { updateViaCache: "none" })
+      .then(reg => { try { reg.update(); } catch (err) {} })
+      .catch(() => {});
+  };
+  if (document.readyState === "complete") bootSW();
+  else window.addEventListener("load", bootSW);
 }

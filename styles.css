@@ -89,3 +89,10 @@ select{font-family:inherit;font-size:16px;font-weight:700;padding:10px;border-ra
 .dw.miss{background:#FFF4CC;color:#7A5A00;text-decoration:underline}
 .sent-stats{margin:0}
 .seg button{font-size:13px;padding:9px 4px}
+
+.brand .ver{color:var(--muted);font-size:12px;font-weight:800;margin-left:4px;letter-spacing:.4px;vertical-align:middle}
+
+.seg{flex-wrap:wrap}
+.mic{min-height:56px;font-size:18px}
+.mic.listening{background:var(--red)!important;--sh:var(--red-d);animation:pulse 1s ease-in-out infinite}
+.pct{font-size:36px;font-weight:900;line-height:1}
