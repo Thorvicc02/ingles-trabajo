@@ -1,4 +1,4 @@
-const CACHE = "ingles-trabajo-v6";
+const CACHE = "ingles-trabajo-v7";
 const AUDIO_CACHE = "ingles-trabajo-audio-v5";
 const ASSETS = ["./", "./index.html", "./styles.css", "./data.js", "./app.js", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png", "./icons/icon-maskable-512.png"];

@@ -136,18 +136,18 @@ persist();
 const ui = { tab: "inicio", th: "todos", vMode: "tarjetas", sMode: "estudiar",
   fc: { idx: 0, flipped: false, pending: false },
   quiz: null, // {qs, qi, picked, score, done}
-  st: { idx: 0, reveal: false, rated: false },
-  wr: { idx: 0, res: null },
-  ch: { idx: 0, picked: null },
-  ord: { idx: 0, pick: [], res: null },
+  st: { idx: 0, reveal: false, rated: false, id: null },
+  wr: { idx: 0, res: null, id: null },
+  ch: { idx: 0, picked: null, id: null },
+  ord: { idx: 0, pick: [], res: null, id: null },
   sFailedOnly: false };
 function resetSub() {
   ui.fc = { idx: 0, flipped: false, pending: ui.fc.pending };
   ui.quiz = null;
-  ui.st = { idx: 0, reveal: false, rated: false };
-  ui.wr = { idx: 0, res: null };
-  ui.ch = { idx: 0, picked: null };
-  ui.ord = { idx: 0, pick: [], res: null };
+  ui.st = { idx: 0, reveal: false, rated: false, id: null };
+  ui.wr = { idx: 0, res: null, id: null };
+  ui.ch = { idx: 0, picked: null, id: null };
+  ui.ord = { idx: 0, pick: [], res: null, id: null };
 }
 
 function isCs() { return save.lang === "cs"; }
@@ -355,6 +355,37 @@ function practiceSents(sents) {
   if (ui.sFailedOnly) list = list.filter(s => isSentFailed(s.id));
   return list;
 }
+function sentById(id, pool) {
+  if (!id) return null;
+  if (pool) {
+    const hit = pool.find(s => s.id === id);
+    if (hit) return hit;
+  }
+  return sentsAll().find(s => s.id === id) || null;
+}
+/* Fija la oración en pantalla. Si no, al calificar el SRS reordena el mazo
+   y el mismo índice apunta a otra frase: parece que saltó y quedó mal. */
+function currentPractice(sents, state) {
+  const deck = practiceSents(sents);
+  if (state.id) {
+    const s = sentById(state.id, sents) || sentById(state.id, deck);
+    if (s) return { deck, s, num: state.num || 1, total: state.total || Math.max(deck.length, 1) };
+  }
+  const list = (state.skipId && deck.length > 1) ? deck.filter(x => x.id !== state.skipId) : deck;
+  const pickFrom = list.length ? list : deck;
+  if (!pickFrom.length) return { deck, s: null, num: 0, total: 0 };
+  const s = pickFrom[0];
+  state.id = s.id;
+  state.skipId = null;
+  state.num = Math.max(1, deck.findIndex(x => x.id === s.id) + 1);
+  state.total = deck.length;
+  return { deck, s, num: state.num, total: state.total };
+}
+function advancePractice(state, extra) {
+  const skipId = state.id;
+  Object.keys(state).forEach(k => { delete state[k]; });
+  Object.assign(state, extra || {}, { id: null, skipId });
+}
 function viewSentStats(all) {
   const st = sentStats(all);
   return `<p class="small center sent-stats"><span class="ok">Dominadas ${st.mastered}</span> · En curso ${st.learning} · Nuevas ${st.neu}</p>
@@ -511,10 +542,9 @@ function viewQuiz() {
 }
 
 function viewStudy(sents) {
-  const deck = practiceSents(sents);
+  const { s, num, total } = currentPractice(sents, ui.st);
   const c = ui.st;
-  if (!deck.length) return viewSentStats(sentsAll()) + emptyDeckMsg();
-  const s = deck[c.idx % deck.length];
+  if (!s) return viewSentStats(sentsAll()) + emptyDeckMsg();
   let body;
   if (!c.reveal) {
     body = `<div class="card center sent-prompt">
@@ -543,14 +573,13 @@ function viewStudy(sents) {
     }
   }
   return `${viewSentStats(sentsAll())}
-  <p class="small">Frase ${c.idx % deck.length + 1} de ${deck.length} · ${thLabelOf(s.th)}</p>
+  <p class="small">Frase ${num} de ${total} · ${thLabelOf(s.th)}</p>
   ${body}`;
 }
 function viewWrite(sents) {
-  const deck = practiceSents(sents);
+  const { s, num, total } = currentPractice(sents, ui.wr);
   const w = ui.wr;
-  if (!deck.length) return viewSentStats(sentsAll()) + emptyDeckMsg();
-  const s = deck[w.idx % deck.length];
+  if (!s) return viewSentStats(sentsAll()) + emptyDeckMsg();
   const ph = isCs() ? "Escribe la oración en checo…" : "Escribe la oración en inglés…";
   let body = `<div class="card center sent-prompt">
     <p class="small">Escribe esta oración en ${langName()}</p>
@@ -573,7 +602,7 @@ function viewWrite(sents) {
     </div>`;
   }
   return `${viewSentStats(sentsAll())}
-  <p class="small">Frase ${w.idx % deck.length + 1} de ${deck.length} · ${thLabelOf(s.th)}</p>
+  <p class="small">Frase ${num} de ${total} · ${thLabelOf(s.th)}</p>
   ${body}`;
 }
 
@@ -582,10 +611,10 @@ function chooseOpts(s, bank) {
   return shuffle([s.en, ...wrong], hash(s.id) + 3);
 }
 function viewChoose(sents, bank) {
-  const deck = practiceSents(sents);
-  if (!deck.length) return viewSentStats(sentsAll()) + emptyDeckMsg();
-  const c = ui.ch, s = deck[c.idx % deck.length], options = chooseOpts(s, bank), ans = options.indexOf(s.en);
-  return `${viewSentStats(sentsAll())}<p class="small">Frase ${c.idx % deck.length + 1} de ${deck.length} · ${thLabelOf(s.th)}</p>
+  const { s, num, total } = currentPractice(sents, ui.ch);
+  if (!s) return viewSentStats(sentsAll()) + emptyDeckMsg();
+  const c = ui.ch, options = chooseOpts(s, bank), ans = options.indexOf(s.en);
+  return `${viewSentStats(sentsAll())}<p class="small">Frase ${num} de ${total} · ${thLabelOf(s.th)}</p>
   <div class="card center"><p class="small">¿Cómo se dice en ${langName()}?</p><div class="s-es">${esc(s.es)}</div></div>
   <div class="opts">${options.map((o, i) => { const st = c.picked === null ? "" : i === ans ? "right" : i === c.picked ? "wrong" : "dim";
     return `<button class="opt ${st}" data-act="cpick" data-v="${i}" data-ans="${ans}" data-id="${s.id}" ${c.picked !== null ? "disabled" : ""}>${esc(o)}</button>`; }).join("")}</div>
@@ -597,10 +626,10 @@ function orderWords(s) {
   return order.map(i => w[i]);
 }
 function viewOrder(sents) {
-  const deck = practiceSents(sents);
-  if (!deck.length) return viewSentStats(sentsAll()) + emptyDeckMsg();
-  const o = ui.ord, s = deck[o.idx % deck.length], words = orderWords(s);
-  return `${viewSentStats(sentsAll())}<p class="small">Frase ${o.idx % deck.length + 1} de ${deck.length} · ${thLabelOf(s.th)}</p>
+  const { s, num, total } = currentPractice(sents, ui.ord);
+  if (!s) return viewSentStats(sentsAll()) + emptyDeckMsg();
+  const o = ui.ord, words = orderWords(s);
+  return `${viewSentStats(sentsAll())}<p class="small">Frase ${num} de ${total} · ${thLabelOf(s.th)}</p>
   <div class="card center"><p class="small">Ordena las palabras para traducir:</p><div class="s-es">${esc(s.es)}</div></div>
   <div class="answer ${o.res || ""}">${o.pick.length ? o.pick.map((i, j) => `<button class="chip" data-act="unpick" data-v="${j}" ${o.res ? "disabled" : ""}>${esc(words[i])}</button>`).join("") : `<span class="small muted">Toca las palabras en orden…</span>`}</div>
   <div class="bank">${words.map((w, i) => `<button class="chip ${o.pick.includes(i) ? "used" : ""}" data-act="opick" data-v="${i}" ${o.pick.includes(i) || o.res ? "disabled" : ""}>${esc(w)}</button>`).join("")}</div>
@@ -670,20 +699,38 @@ document.addEventListener("click", e => {
     case "quizstart": startQuiz(curWords(), wordsAll()); break;
     case "qpick": { const z = ui.quiz; if (z.picked !== null) break; z.picked = +v; if (+v === z.qs[z.qi].ans) { z.score++; gain(10); } break; }
     case "qnext": { const z = ui.quiz; if (z.qi + 1 >= z.qs.length) { z.done = true; if (z.score >= Math.ceil(z.qs.length * 0.75)) gain(10); } else { z.qi++; z.picked = null; } break; }
-    case "cpick": if (ui.ch.picked !== null) break; ui.ch.picked = +v; if (+v === +b.dataset.ans) sentOk(b.dataset.id, 10); else gradeSent(b.dataset.id, "again"); break;
-    case "cnext": ui.ch.idx++; ui.ch.picked = null; break;
-    case "opick": ui.ord.pick.push(+v); break;
-    case "unpick": ui.ord.pick.splice(+v, 1); break;
-    case "oclear": ui.ord.pick = []; break;
-    case "ocheck": { const ss = practiceSents(curSents()); const s = ss[ui.ord.idx % ss.length]; if (!s) break; const w = orderWords(s);
-      const ok = ui.ord.pick.map(i => w[i]).join(" ") === s.en; ui.ord.res = ok ? "ok" : "bad"; if (ok) sentOk(s.id, 15); else gradeSent(s.id, "again"); break; }
-    case "onext": ui.ord = { idx: ui.ord.idx + 1, pick: [], res: null }; break;
+    case "cpick": {
+      if (ui.ch.picked !== null) break;
+      const s = sentById(ui.ch.id, curSents()) || sentById(b.dataset.id, curSents());
+      if (!s || (b.dataset.id && b.dataset.id !== s.id)) break;
+      ui.ch.picked = +v;
+      if (+v === +b.dataset.ans) sentOk(s.id, 10); else gradeSent(s.id, "again");
+      ui._speak = { t: s.en, id: s.id, kind: "s" };
+      break;
+    }
+    case "cnext": if (ui.ch.picked === null) break; advancePractice(ui.ch, { picked: null }); break;
+    case "opick": if (ui.ord.res) break; ui.ord.pick.push(+v); break;
+    case "unpick": if (ui.ord.res) break; ui.ord.pick.splice(+v, 1); break;
+    case "oclear": if (ui.ord.res) break; ui.ord.pick = []; break;
+    case "ocheck": {
+      if (ui.ord.res) break;
+      const s = sentById(ui.ord.id, curSents()); if (!s) break;
+      const w = orderWords(s);
+      const ok = ui.ord.pick.map(i => w[i]).join(" ") === s.en; ui.ord.res = ok ? "ok" : "bad";
+      if (ok) sentOk(s.id, 15); else gradeSent(s.id, "again");
+      ui._speak = { t: s.en, id: s.id, kind: "s" };
+      break;
+    }
+    case "onext": if (!ui.ord.res) break; advancePractice(ui.ord, { pick: [], res: null }); break;
     case "sreveal": ui.st.reveal = true; break;
-    case "srate": { const ss = practiceSents(curSents()); const s = ss[ui.st.idx % ss.length]; if (!s || ui.st.rated) break;
-      gradeSent(s.id, v, 10); ui.st.rated = v; break; }
-    case "snext": ui.st = { idx: ui.st.idx + 1, reveal: false, rated: false }; break;
+    case "srate": {
+      const s = sentById(ui.st.id, curSents()); if (!s || ui.st.rated) break;
+      gradeSent(s.id, v, 10); ui.st.rated = v; break;
+    }
+    case "snext": if (!ui.st.rated) break; advancePractice(ui.st, { reveal: false, rated: false }); break;
     case "wcheck": {
-      const ss = practiceSents(curSents()); const s = ss[ui.wr.idx % ss.length]; if (!s || ui.wr.res) break;
+      if (ui.wr.res) break;
+      const s = sentById(ui.wr.id, curSents()); if (!s) break;
       const typed = (document.getElementById("sent-input") || {}).value || "";
       const res = judgeTyped(typed, s);
       ui.wr.res = res;
@@ -695,7 +742,7 @@ document.addEventListener("click", e => {
       break;
     }
     case "wretry": ui.wr.res = null; break;
-    case "wnext": ui.wr = { idx: ui.wr.idx + 1, res: null }; break;
+    case "wnext": if (!ui.wr.res || ui.wr.res.empty) break; advancePractice(ui.wr, { res: null }); break;
     case "export": exportProgress(); return;
     case "import": document.getElementById("imp").click(); return;
     case "reset": if (confirm("¿Seguro? Se borrará todo tu XP, rachas y palabras aprendidas.")) { save = Object.assign({}, BLANK, { goal: save.goal, lvl: save.lvl, lang: save.lang }); persist(); } break;
@@ -717,7 +764,7 @@ document.addEventListener("change", e => {
   if (a === "theme") { ui.th = t.value; resetSub(); }
   else if (a === "goal") { save.goal = Number(t.value); persist(); }
   else if (a === "pending") { ui.fc = { idx: 0, flipped: false, pending: t.checked }; }
-  else if (a === "failedOnly") { ui.sFailedOnly = t.checked; ui.st = { idx: 0, reveal: false, rated: false }; ui.wr = { idx: 0, res: null }; ui.ch = { idx: 0, picked: null }; ui.ord = { idx: 0, pick: [], res: null }; }
+  else if (a === "failedOnly") { ui.sFailedOnly = t.checked; resetSub(); }
   else if (t.id === "imp") { if (t.files[0]) importProgress(t.files[0]); return; }
   else return;
   render();
